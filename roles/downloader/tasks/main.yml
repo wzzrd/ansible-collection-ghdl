@@ -42,6 +42,7 @@
     headers:
       Authorization: "Bearer {{ downloader_github_token }}"
   register: github_api_data
+  run_once: true
   delegate_to: localhost
 
 - name: Select binary URLs
@@ -85,6 +86,8 @@
       ansible.builtin.copy:
         src: "{{ item }}"
         dest: "{{ downloader_install_dir }}"
+        owner: "{{ downloader_binary_owner }}"
+        group: "{{ downloader_binary_group }}"
         remote_src: true
         mode: '0755'
       loop:

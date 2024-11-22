@@ -18,3 +18,6 @@ downloader_archive_regex: '.*\.(zip|tar|tar\.gz|tgz|tar\.bz2|tar\.xz)$'
 
 downloader_install_dir: /usr/local/bin
 downloader_tmp_dir: /tmp/downloader
+
+downloader_binary_owner: root
+downloader_binary_group: root
