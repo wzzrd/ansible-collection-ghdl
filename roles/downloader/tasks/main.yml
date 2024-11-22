@@ -1,0 +1,114 @@
+---
+- name: Pre-flight org / project variable checks
+  ansible.builtin.assert:
+    that:
+      - downloader_organization is defined
+      - downloader_project is defined
+    msg: >
+      You need to set both the 'downloader_organization' and 'downloader_project'
+      variables to the name of an organisation on GitHub and a project in that
+      organisation, respectively.
+
+- name: Pre-flight GitHub token check
+  ansible.builtin.assert:
+    that:
+      - >
+        downloader_github_token is defined
+    msg: >
+      You need to set the value of the github_token token variable to a GitHub
+      Personal Access Token. The GitHub API throttles unauthenticated requests to
+      60 per hour, which might not be enough for even slightly larger
+      infrastructure. Therefore, we require a PAT set in this playbook.
+
+- name: Gather facts subset
+  ansible.builtin.setup:
+    gather_subset:
+      - '!all'
+      - architecture
+
+- name: Set matcher fact
+  ansible.builtin.set_fact:
+    matcher: downloader_matchers_{{ ansible_system | lower }}_{{ ansible_architecture }}
+
+- name: Set matcher list
+  ansible.builtin.set_fact:
+    matcher_list: "{{ vars[matcher] }}"
+
+- name: Download the release data from the API
+  ansible.builtin.uri:
+    url:
+      "https://api.github.com/repos/{{ downloader_organization }}/\
+       {{ downloader_project }}/releases/latest"
+    headers:
+      Authorization: "Bearer {{ downloader_github_token }}"
+  register: github_api_data
+  delegate_to: localhost
+
+- name: Select binary URLs
+  ansible.builtin.set_fact:
+    result_url: "{{ github_api_data | wzzrd.ghdl.filter_binaries(matcher_list) }}"
+
+- name: Create download directory
+  ansible.builtin.file:
+    path: "{{ downloader_tmp_dir }}"
+    state: directory
+    mode: '0750'
+
+- name: Download the file
+  ansible.builtin.get_url:
+    url: "{{ result_url }}"
+    dest: "{{ downloader_tmp_dir }}"
+    mode: '0640'
+
+- name: Handle archive
+  when: result_url is match(downloader_archive_regex)
+  block:
+    - name: Extract file
+      ansible.builtin.unarchive:
+        src: "{{ downloader_tmp_dir ~ '/' ~ result_url | basename }}"
+        dest: "{{ downloader_tmp_dir }}"
+        remote_src: true
+
+    - name: Find executable files in extracted directory
+      ansible.builtin.find:
+        paths: "{{ downloader_tmp_dir }}"
+        recurse: true
+        file_type: file
+      register: found_files
+
+    - name: Filter only executable files
+      ansible.builtin.set_fact:
+        executable_files: >-
+          {{ found_files.files | selectattr('mode', 'search', '.*[157]$') | map(attribute='path') | list }}
+
+    - name: Copy file to {{ downloader_install_dir }}
+      ansible.builtin.copy:
+        src: "{{ item }}"
+        dest: "{{ downloader_install_dir }}"
+        remote_src: true
+        mode: '0755'
+      loop:
+        "{{ executable_files }}"
+
+- name: Handle single binary
+  when: result_url is not match(downloader_archive_regex)
+  block:
+    - name: Determine src_filename
+      ansible.builtin.set_fact:
+        src_filename: "{{ result_url | basename }}"
+
+    - name: Determine dest_filename
+      ansible.builtin.set_fact:
+        dest_filename: "{{ src_filename | split('-') }}"
+
+    - name: Copy file to {{ downloader_install_dir }}
+      ansible.builtin.copy:
+        src: "{{ downloader_tmp_dir ~ '/' ~ src_filename }}"
+        dest: "{{ downloader_install_dir ~ '/' ~ dest_filename[0] }}"
+        remote_src: true
+        mode: '0755'
+
+- name: Delete download directory again
+  ansible.builtin.file:
+    path: "{{ downloader_tmp_dir }}"
+    state: absent

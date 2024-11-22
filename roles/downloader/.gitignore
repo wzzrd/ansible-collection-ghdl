@@ -1,0 +1,4 @@
+inventory
+ansible.cfg
+filter_plugins/__pycache__
+.envrc

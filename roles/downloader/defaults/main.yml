@@ -1,0 +1,20 @@
+downloader_matchers_linux_x86_64:
+  - x86_64-unknown-linux-gnu
+  - x86_64-unknown-linux-musl
+  - linux_amd64
+  - x86_64-linux
+  - linux-amd64
+
+downloader_matchers_linux_aarch64:
+  - aarch64-unknown-linux-gnu
+  - aarch64-unknown-linux-musl
+  - linux_arm64
+  - aarch64-linux
+  - linux-arm64
+
+downloader_matchers_darwin_arm64: []
+
+downloader_archive_regex: '.*\.(zip|tar|tar\.gz|tgz|tar\.bz2|tar\.xz)$'
+
+downloader_install_dir: /usr/local/bin
+downloader_tmp_dir: /tmp/downloader
