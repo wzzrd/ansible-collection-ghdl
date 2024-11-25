@@ -22,7 +22,7 @@ def filter_binaries(api_dict, matchers):
     filtered_urls = [ e for e in all_urls if any(match in e for match in matchers) ]
     #pprint(filtered_urls)
 
-    drop_matchers = ["sha256", "-update", "apk" ]
+    drop_matchers = ["sha256", "-update", "apk", "rpm", "deb", "zst", "exe" ]
     binary_urls = [ e for e in filtered_urls if not any(match in e for match in drop_matchers) ]
 
     return binary_urls[0]
