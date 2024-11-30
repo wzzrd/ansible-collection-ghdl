@@ -1,0 +1,37 @@
+---
+dependency:
+  name: galaxy
+  options:
+    requirements-file: requirements.yml
+platforms:
+  - name: ubi8
+    image: registry.access.redhat.com/ubi8/ubi-init:latest
+    pre_build_image: true
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:ro
+    privileged: true
+    command: "/usr/sbin/init"
+    platform: linux/amd64
+    cgroupns_mode: host
+  - name: ubi9
+    image: registry.access.redhat.com/ubi9/ubi-init:latest
+    pre_build_image: true
+    cgroupns_mode: host
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+    privileged: true
+    command: "/usr/sbin/init"
+    platform: linux/amd64
+provisioner:
+  name: ansible
+  inventory:
+    group_vars:
+      all:
+        downloader_github_token: "{{ lookup('ansible.builtin.env', 'GITHUB_PAT') }}"
+    host_vars:
+      ubi8:
+        ansible_python_interpreter: /usr/libexec/platform-python
+      ubi9:
+        ansible_python_interpreter: /usr/bin/python3
+verifier:
+  name: ansible

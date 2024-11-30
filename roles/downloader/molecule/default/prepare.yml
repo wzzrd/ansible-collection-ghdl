@@ -1,0 +1,16 @@
+- name: Prepare containers for molecule tests
+  hosts: all
+  gather_facts: false
+
+  tasks:
+  pre_tasks:
+    - name: Gather required subset of facts
+      ansible.builtin.setup:
+        gather_subset:
+          - '!all'
+          - python
+
+    - name: Install tar for during tests
+      ansible.builtin.package:
+        name: tar
+        state: present
