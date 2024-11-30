@@ -4,21 +4,23 @@
     that:
       - downloader_organization is defined
       - downloader_project is defined
-    msg: >
+    fail_msg: >
       You need to set both the 'downloader_organization' and 'downloader_project'
       variables to the name of an organisation on GitHub and a project in that
       organisation, respectively.
+    success_msg: Both 'downloader_organization' and 'downloader_project' are set.
 
 - name: Pre-flight GitHub token check
   ansible.builtin.assert:
     that:
       - >
         downloader_github_token is defined
-    msg: >
+    fail_msg: >
       You need to set the value of the github_token token variable to a GitHub
       Personal Access Token. The GitHub API throttles unauthenticated requests to
       60 per hour, which might not be enough for even slightly larger
       infrastructure. Therefore, we require a PAT set in this playbook.
+    success_msg: The variable 'downloader_github_token' is set.
 
 - name: Gather facts subset
   ansible.builtin.setup:
