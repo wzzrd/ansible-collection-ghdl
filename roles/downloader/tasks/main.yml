@@ -36,7 +36,7 @@
   ansible.builtin.set_fact:
     matcher_list: "{{ vars[matcher] }}"
 
-- name: Download the release data from the API
+- name: Download the release data from the API for the latest version
   ansible.builtin.uri:
     url:
       "https://api.github.com/repos/{{ downloader_organization }}/\
@@ -47,6 +47,20 @@
   run_once: true
   become: false
   delegate_to: localhost
+  when: downloader_version is undefined
+
+- name: Download the release data from the API for version {{ downloader_version }}
+  ansible.builtin.uri:
+    url:
+      "https://api.github.com/repos/{{ downloader_organization }}/\
+      {{ downloader_project }}/releases/tags/{{ downloader_version }}"
+    headers:
+      Authorization: "Bearer {{ downloader_github_token }}"
+  register: github_api_data
+  run_once: true
+  become: false
+  delegate_to: localhost
+  when: downloader_version is defined
 
 - name: Select binary URLs
   ansible.builtin.set_fact:
