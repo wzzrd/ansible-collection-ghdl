@@ -1,2 +1,5 @@
 plugins/filter/__pycache__
 *gz
+.devcontainer
+.envrc
+.vscode
