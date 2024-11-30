@@ -122,3 +122,4 @@
   ansible.builtin.file:
     path: "{{ downloader_tmp_dir }}"
     state: absent
+  when: downloader_delete_tmp_dir == true

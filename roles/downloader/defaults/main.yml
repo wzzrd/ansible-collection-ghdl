@@ -21,3 +21,5 @@ downloader_tmp_dir: /tmp/downloader
 
 downloader_binary_owner: root
 downloader_binary_group: root
+
+downloader_delete_tmp_dir: false
