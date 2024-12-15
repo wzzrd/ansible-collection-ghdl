@@ -1,0 +1,4 @@
+---
+# defaults file for starship
+starship_bin_dir: /usr/local/bin
+starship_libc: gnu

@@ -1,0 +1,47 @@
+---
+- name: Check if starship_version is set
+  ansible.builtin.assert:
+    that: starship_version is defined
+    fail_msg: The variable starship_version is not set, assuming "latest"
+    success_msg: The variable starship_version is set to {{ starship_version }}
+  failed_when: false
+
+- name: Check if starship is installed already
+  ansible.builtin.stat:
+    path: "{{ starship_bin_dir }}/starship"
+  register: starship_stat
+
+- name: Get version of starship if already installed
+  when: starship_stat.stat.exists
+  tags:
+    - version
+  block:
+    - name: Get version of currently installed starship
+      ansible.builtin.command:
+        argv:
+          - "{{ starship_bin_dir }}/starship"
+          - -V
+      register: version_output
+      changed_when: false
+
+    - name: Store detected version for later
+      ansible.builtin.set_fact:
+        detected_version: "{{ version_output.stdout | split | last }}"
+
+    - name: Show detected version if debugging
+      ansible.builtin.debug:
+        msg: "{{ detected_version }}"
+      when:
+        - debug is defined
+        - debug
+
+- name: Download and install new binary, if needed
+  when: (detected_version is not defined) or
+        (starship_version | default('') != detected_version | default('not_set'))
+  ansible.builtin.include_role:
+    name: wzzrd.ghdl.downloader
+  vars:
+    downloader_organization: starship
+    downloader_project: starship
+    downloader_install_dir: "{{ starship_bin_dir }}"
+    downloader_version: "{{ starship_version | default(omit) }}"

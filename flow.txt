@@ -1,0 +1,48 @@
+
+
+role is called 
+
+role checks whether binary is already installed (install location + binary name - do we know binary name??)
+downloader_binary_name can be optional and default to github_project
+
+if binary is installed, check version with version_command
+
+if it is not installed binary_version will be 'none'
+if it is installed, binary_version will be the output of the version_command
+
+if downloader_version is set, it then compares the binary_version to the downloader_version
+if downloader_version is not set - we assume latest then - it:
+    fetches the latest version from the github api
+    extracts the version from that
+    sets downloader_version to that
+    makes the comparison anyway
+
+if the output of the above is "different", we continue, else, we stop here
+
+"different" so we need to download
+
+extract the downloader_url from the api output (might do that above already, is small task)
+download the payload
+
+if archive 
+unarchive, copy to location (downloader_install_location) + set owner + mode
+
+if binary
+copy to location (downloader_install_location) + set owner + mode
+
+remove temporary files (optional for idempotency)
+
+
+variables:
+org
+project 
+binary_name (optional)
+downloader_version (optional)
+downloader_install_dir (defaults to /usr/local/bin)
+downloader_owner (defaults to root)
+downloader_group (defaults to root)
+downloader_mode (defaults to 0755)
+
+matchers can be overridden
+    prefer musl over glibc
+

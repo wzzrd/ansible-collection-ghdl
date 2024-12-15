@@ -12,7 +12,6 @@ platforms:
     privileged: true
     command: "/usr/sbin/init"
     platform: linux/amd64
-    cgroupns_mode: host
   - name: ubi9
     image: registry.access.redhat.com/ubi9/ubi-init:latest
     pre_build_image: true
@@ -22,23 +21,11 @@ platforms:
     privileged: true
     command: "/usr/sbin/init"
     platform: linux/amd64
-driver:
-  name: podman
-  options:
-    managed: false
-    login_cmd_template: "podman exec -it {instance} bash"
-    ansible_connection_options:
-      ansible_connection: podman
 provisioner:
   name: ansible
   inventory:
-    group_vars:
-      all:
-        downloader_github_token: "{{ lookup('ansible.builtin.env', 'GITHUB_PAT') }}"
     host_vars:
       ubi8:
-        ansible_python_interpreter: /usr/libexec/platform-python
-      ubi9:
-        ansible_python_interpreter: /usr/bin/python3
+        starship_libc: "musl"
 verifier:
   name: ansible

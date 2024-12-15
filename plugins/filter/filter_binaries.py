@@ -1,5 +1,5 @@
 #import json
-#from pprint import pprint
+from pprint import pprint
 from ansible.errors import AnsibleFilterError
 
 def filter_binaries(api_dict, matchers):
@@ -15,6 +15,8 @@ def filter_binaries(api_dict, matchers):
         assets = api_dict['json']['assets']
     except (KeyError):
         raise AnsibleFilterError("The dictionary doesn't have an 'assets' object. Is it proper GitHub API output?")
+
+    pprint(api_dict)
 
     all_urls = [ e['browser_download_url'] for e in assets ]
     #pprint(all_urls)

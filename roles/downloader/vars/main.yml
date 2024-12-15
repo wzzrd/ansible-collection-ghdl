@@ -1,2 +1,2 @@
 ---
-# vars file for downloader
+downloader_archive_regex: '.*\.(zip|tar|tar\.gz|tgz|tar\.bz2|tar\.xz)$'

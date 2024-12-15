@@ -1,0 +1,13 @@
+- name: Converge
+  hosts: all
+  gather_facts: false
+  pre_tasks:
+    - name: Gather required subset of facts
+      ansible.builtin.setup:
+        gather_subset:
+          - '!all'
+
+  roles:
+    - role: starship
+      vars:
+        starship_version: 1.18.0

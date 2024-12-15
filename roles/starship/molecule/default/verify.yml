@@ -7,7 +7,7 @@
   gather_facts: false
 
   tasks:
-    - name: Check if atuin binary exists
+    - name: Check if starship binary exists
       block:
         - name: Check for existence for /usr/local/bin/starship
           ansible.builtin.stat:

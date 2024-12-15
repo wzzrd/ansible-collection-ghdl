@@ -1,0 +1,48 @@
+---
+- name: Set matcher fact
+  ansible.builtin.set_fact:
+    matcher: downloader_matchers_{{ ansible_system | lower }}_{{ ansible_architecture }}
+
+- name: Set matcher list
+  ansible.builtin.set_fact:
+    matcher_list: "{{ vars[matcher] }}"
+
+- name: Download the release data from the API for the latest version
+  ansible.builtin.uri:
+    url:
+      "https://api.github.com/repos/{{ downloader_organization }}/\
+       {{ downloader_project }}/releases/latest"
+    headers:
+      Authorization: "Bearer {{ downloader_github_token }}"
+  register: github_api_data_latest
+  run_once: true
+  become: false
+  delegate_to: localhost
+  when: downloader_version is undefined
+
+- name: Download the release data from the API for version {{ downloader_version }}
+  ansible.builtin.uri:
+    url:
+      "https://api.github.com/repos/{{ downloader_organization }}/\
+      {{ downloader_project }}/releases/tags/{{ downloader_version }}"
+    headers:
+      Authorization: "Bearer {{ downloader_github_token }}"
+  register: github_api_data_versioned
+  run_once: true
+  become: false
+  delegate_to: localhost
+  when: downloader_version is defined
+
+- name: Select binary URLs for latest version
+  ansible.builtin.set_fact:
+    result_url: "{{ github_api_data_latest | wzzrd.ghdl.filter_binaries(matcher_list) }}"
+  when: github_api_data_latest.json.assets is defined
+
+- name: Select binary URLs for named version
+  ansible.builtin.set_fact:
+    result_url: "{{ github_api_data_latest | wzzrd.ghdl.filter_binaries(matcher_list) }}"
+  when: github_api_data_versioned.json.assets is defined
+
+- name: debug
+  ansible.builtin.debug:
+    msg: "url: {{ result_url }}"
