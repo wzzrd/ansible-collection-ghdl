@@ -4,6 +4,13 @@
     src: "{{ downloader_tmp_dir ~ '/' ~ result_url | basename }}"
     dest: "{{ downloader_tmp_dir }}"
     remote_src: true
+  when: result_url is not search('(?<!tar)\.bz2$')
+
+- name: Extract plain bz2 file
+  ansible.builtin.command:
+    cmd: bunzip2 "{{ downloader_tmp_dir ~ '/' ~ result_url | basename }}"
+    creates: "{{ downloader_tmp_dir ~ '/' ~ result_url | basename | regex_replace('\\.bz2$', '') }}"
+  when: result_url is search('(?<!tar)\.bz2$')
 
 - name: Find executable files in extracted directory
   ansible.builtin.find:
@@ -16,11 +23,26 @@
   ansible.builtin.set_fact:
     executable_files: >-
       {{ found_files.files | selectattr('mode', 'search', '.*[157]$') | map(attribute='path') | list }}
+  when: result_url is not search('(?<!tar)\.bz2$')
+  
+- name: Filter the previously bzipped file
+  ansible.builtin.set_fact:
+    executable_files: ["{{ downloader_tmp_dir ~ '/' ~ result_url | basename | regex_replace('\\.bz2$', '') }}"]
+  when: result_url is search('(?<!tar)\.bz2$')
+
+- name: Debug found executable files
+  ansible.builtin.debug:
+    msg: "Found executable files: {{ executable_files }}"
+  when: downloader_debug | default(false)
+
+- name: Debug found single executable file
+  ansible.builtin.debug:
+    msg: "{{ executable_files }}"
 
 - name: Copy file to {{ downloader_install_dir }}
   ansible.builtin.copy:
     src: "{{ item }}"
-    dest: "{{ downloader_install_dir }}"
+    dest: "{{ downloader_install_dir }}/{{ downloader_binary_name | default(downloader_project) }}"
     owner: "{{ downloader_binary_owner }}"
     group: "{{ downloader_binary_group }}"
     remote_src: true

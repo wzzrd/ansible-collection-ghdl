@@ -33,6 +33,11 @@
   delegate_to: localhost
   when: downloader_version is defined
 
+- name: Show downloaded GitHub API data
+  ansible.builtin.debug:
+    msg: "GitHub API data: {{ github_api_data_versioned }}"
+  when: downloader_debug | default(false)
+
 - name: Select binary URLs for latest version
   ansible.builtin.set_fact:
     result_url: "{{ github_api_data_latest | wzzrd.ghdl.filter_binaries(matcher_list) }}"
@@ -43,6 +48,7 @@
     result_url: "{{ github_api_data_latest | wzzrd.ghdl.filter_binaries(matcher_list) }}"
   when: github_api_data_versioned.json.assets is defined
 
-- name: debug
+- name: Show resulting download URL on GitHub
   ansible.builtin.debug:
     msg: "url: {{ result_url }}"
+  when: downloader_debug | default(false)

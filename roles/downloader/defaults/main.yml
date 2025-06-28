@@ -4,6 +4,7 @@ downloader_matchers_linux_x86_64:
   - linux_amd64
   - x86_64-linux
   - linux-amd64
+  - linux_amd64
 
 downloader_matchers_linux_aarch64:
   - aarch64-unknown-linux-musl
@@ -11,13 +12,11 @@ downloader_matchers_linux_aarch64:
   - linux_arm64
   - aarch64-linux
   - linux-arm64
+  - linux_arm64
 
 downloader_matchers_darwin_arm64: []
 
 downloader_install_dir: /usr/local/bin
-downloader_tmp_dir: /tmp/downloader
 
 downloader_binary_owner: root
 downloader_binary_group: root
-
-downloader_delete_tmp_dir: false

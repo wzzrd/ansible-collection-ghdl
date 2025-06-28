@@ -5,28 +5,34 @@
 - name: Select binary
   ansible.builtin.include_tasks: tasks/select_binary.yml
 
-- name: Create download directory
-  ansible.builtin.file:
-    path: "{{ downloader_tmp_dir }}"
-    state: directory
-    mode: '0750'
+- name: Download, extract, move and cleanup
+  block:
+  - name: Create download directory
+    ansible.builtin.tempfile:
+      state: directory
+      prefix: downloader.
+    register: _tmp_dir
 
-- name: Download the file
-  ansible.builtin.get_url:
-    url: "{{ result_url }}"
-    dest: "{{ downloader_tmp_dir }}"
-    mode: '0640'
+  - name: Set temporary directory path fact
+    ansible.builtin.set_fact:
+      downloader_tmp_dir: "{{ _tmp_dir.path }}"
 
-- name: Handle archive
-  ansible.builtin.include_tasks: tasks/handle_archive.yml
-  when: result_url is match(downloader_archive_regex)
+  - name: Download the file
+    ansible.builtin.get_url:
+      url: "{{ result_url }}"
+      dest: "{{ downloader_tmp_dir }}"
+      mode: '0640'
 
-- name: Handle single binary
-  ansible.builtin.include_tasks: tasks/handle_binary.yml
-  when: result_url is not match(downloader_archive_regex)
+  - name: Handle archive
+    ansible.builtin.include_tasks: tasks/handle_archive.yml
+    when: result_url is match(downloader_archive_regex)
 
-- name: Delete download directory again
-  ansible.builtin.file:
-    path: "{{ downloader_tmp_dir }}"
-    state: absent
-  when: downloader_delete_tmp_dir
+  - name: Handle single binary
+    ansible.builtin.include_tasks: tasks/handle_binary.yml
+    when: result_url is not match(downloader_archive_regex)
+  
+  always:
+  - name: Delete download directory again
+    ansible.builtin.file:
+      path: "{{ downloader_tmp_dir }}"
+      state: absent
