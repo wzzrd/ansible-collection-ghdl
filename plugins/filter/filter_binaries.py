@@ -1,3 +1,49 @@
+#!/usr/bin/env python
+
+DOCUMENTATION = r'''
+name: filter_binaries
+short_description: Filter GitHub API release assets to find binary downloads
+description:
+    - This filter takes GitHub API release data and a list of matchers to find relevant binary downloads
+    - It filters out common package formats (rpm, deb, apk, etc.) and checksum files
+    - Returns the first matching binary download URL
+version_added: "1.0.0"
+author: "Your Name"
+options:
+    api_dict:
+        description:
+            - Dictionary containing GitHub API release data
+            - Must contain a 'json' key with 'assets' array
+        type: dict
+        required: true
+    matchers:
+        description:
+            - List of substrings to match against asset download URLs
+            - URLs containing any of these substrings will be included
+        type: list
+        elements: str
+        required: true
+'''
+
+EXAMPLES = r'''
+# Filter GitHub release assets for Linux x86_64 binaries
+- name: Get binary URL for Linux x86_64
+  set_fact:
+    binary_url: "{{ github_release_data | wzzrd.ghdl.filter_binaries(['linux', 'x86_64']) }}"
+
+# Filter for multiple architecture options
+- name: Get binary URL for ARM64
+  set_fact:
+    binary_url: "{{ github_release_data | wzzrd.ghdl.filter_binaries(['arm64', 'aarch64']) }}"
+'''
+
+RETURN = r'''
+_value:
+    description: First matching binary download URL
+    type: str
+    returned: success
+'''
+
 from pprint import pprint
 from ansible.errors import AnsibleFilterError
 
