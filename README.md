@@ -237,7 +237,7 @@ This role includes a custom filter plugin (`wzzrd.ghdl.filter_binaries`) that ha
 
 ## License
 
-BSD-3-Clause
+GPL-3.0-or-later
 
 ## Author Information
 
