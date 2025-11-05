@@ -19,6 +19,7 @@
   become: false
   delegate_to: localhost
   when: downloader_version is undefined
+  no_log: true
 
 - name: Download the release data from the API for version {{ downloader_version }}
   ansible.builtin.uri:
@@ -32,6 +33,7 @@
   become: false
   delegate_to: localhost
   when: downloader_version is defined
+  no_log: true
 
 - name: Show downloaded GitHub API data
   ansible.builtin.debug:
@@ -45,7 +47,7 @@
 
 - name: Select binary URLs for named version
   ansible.builtin.set_fact:
-    result_url: "{{ github_api_data_latest | wzzrd.ghdl.filter_binaries(matcher_list) }}"
+    result_url: "{{ github_api_data_versioned | wzzrd.ghdl.filter_binaries(matcher_list) }}"
   when: github_api_data_versioned.json.assets is defined
 
 - name: Show resulting download URL on GitHub

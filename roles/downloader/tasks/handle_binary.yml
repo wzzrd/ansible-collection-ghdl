@@ -3,19 +3,15 @@
   ansible.builtin.set_fact:
     src_filename: "{{ result_url | basename }}"
 
-- name: Determine dest_filename - split by dash
+- name: Determine dest_filename
   ansible.builtin.set_fact:
-    dest_filename: "{{ src_filename | split('-') }}"
-  when: '"-" in src_filename'
-
-- name: Determine dest_filename - split by period
-  ansible.builtin.set_fact:
-    dest_filename: "{{ src_filename | split('.') }}"
-  when: '"." in src_filename'
+    dest_filename: "{{ downloader_binary_name | default((src_filename | regex_replace('[._-].*', '')) or downloader_project) }}"
 
 - name: Copy file to {{ downloader_install_dir }}
   ansible.builtin.copy:
     src: "{{ downloader_tmp_dir ~ '/' ~ src_filename }}"
-    dest: "{{ downloader_install_dir ~ '/' ~ dest_filename[0] }}"
+    dest: "{{ downloader_install_dir ~ '/' ~ dest_filename }}"
     remote_src: true
     mode: '0755'
+    owner: "{{ downloader_binary_owner }}"
+    group: "{{ downloader_binary_group }}"
