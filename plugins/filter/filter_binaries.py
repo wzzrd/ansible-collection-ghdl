@@ -76,6 +76,14 @@ def filter_binaries(api_dict, matchers):
         e for e in filtered_urls if not any(match in e for match in drop_matchers)
     ]
 
+    if not binary_urls:
+        raise AnsibleFilterError(
+            f"No matching binaries found for matchers {matchers}. "
+            f"Available assets: {[e.split('/')[-1] for e in all_urls]}. "
+            f"After filtering for matchers: {[e.split('/')[-1] for e in filtered_urls]}. "
+            f"After removing package formats: {binary_urls}"
+        )
+
     return binary_urls[0]
 
 

@@ -1,3 +1,4 @@
+.ansible
 plugins/filter/__pycache__
 *gz
 .devcontainer
