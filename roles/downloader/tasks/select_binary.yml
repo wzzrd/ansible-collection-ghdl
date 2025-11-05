@@ -52,9 +52,9 @@
   when: downloader_version is defined
   no_log: true
 
-- name: Show downloaded GitHub API data
+- name: Show available assets from GitHub
   ansible.builtin.debug:
-    msg: "GitHub API data: {{ github_api_data_versioned }}"
+    msg: "Available assets: {{ (github_api_data_latest.json.assets | default(github_api_data_versioned.json.assets | default([]))) | map(attribute='name') | list }}"
   when: downloader_debug | default(false)
 
 - name: Select binary URLs for latest version

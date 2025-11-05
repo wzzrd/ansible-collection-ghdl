@@ -11,23 +11,40 @@
   ansible.builtin.slurp:
     src: "{{ downloader_tmp_dir }}/CHECKSUMS"
   register: checksum_file_content
-  when: checksum_download is succeeded
+  when: checksum_download is succeeded and checksum_download is not skipped
 
 - name: Extract binary filename from download URL
   ansible.builtin.set_fact:
     binary_filename: "{{ result_url | basename }}"
 
-- name: Parse checksum file to find hash for our binary
+- name: Debug binary filename
+  ansible.builtin.debug:
+    msg: "Looking for checksum for: {{ binary_filename }}"
+  when:
+    - downloader_debug | default(false)
+    - checksum_file_url | length > 0
+
+- name: Split checksum file into lines
   ansible.builtin.set_fact:
-    binary_hash: >-
-      {{
-        (checksum_file_content.content | b64decode).split('\n')
-        | select('search', binary_filename)
-        | map('regex_replace', '^\s*([a-fA-F0-9]+)\s+.*$', '\1')
-        | first
-        | default('')
-      }}
+    checksum_lines: "{{ (checksum_file_content.content | b64decode).split('\n') }}"
   when: checksum_file_content is defined and checksum_file_content.content is defined
+
+- name: Find matching checksum line
+  ansible.builtin.set_fact:
+    checksum_line: "{{ checksum_lines | select('search', binary_filename) | list | first | default('') }}"
+  when: checksum_lines is defined
+
+- name: Debug matched line
+  ansible.builtin.debug:
+    msg: "Matched line: {{ checksum_line }}"
+  when:
+    - downloader_debug | default(false)
+    - checksum_line is defined
+
+- name: Extract hash from matching line
+  ansible.builtin.set_fact:
+    binary_hash: "{{ checksum_line.split() | first | default('') }}"
+  when: checksum_line is defined and checksum_line | length > 0
 
 - name: Set checksum for download verification
   ansible.builtin.set_fact:

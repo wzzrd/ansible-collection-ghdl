@@ -44,7 +44,6 @@ _value:
     returned: success
 '''
 
-from pprint import pprint
 from ansible.errors import AnsibleFilterError
 
 
