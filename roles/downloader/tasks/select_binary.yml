@@ -3,6 +3,23 @@
   ansible.builtin.set_fact:
     matcher: downloader_matchers_{{ ansible_system | lower }}_{{ ansible_architecture }}
 
+- name: Validate architecture is supported
+  ansible.builtin.fail:
+    msg: |
+      Unsupported architecture: {{ ansible_system | lower }}_{{ ansible_architecture }}
+
+      Supported architectures:
+        - linux_x86_64
+        - linux_aarch64
+        - darwin_arm64 (matchers currently empty, see defaults/main.yml)
+
+      Current system: {{ ansible_system | lower }}_{{ ansible_architecture }}
+
+      To add support for your architecture, define the variable:
+        downloader_matchers_{{ ansible_system | lower }}_{{ ansible_architecture }}
+      with a list of binary name patterns to match.
+  when: matcher not in vars or vars[matcher] | length == 0
+
 - name: Set matcher list
   ansible.builtin.set_fact:
     matcher_list: "{{ vars[matcher] }}"
@@ -53,4 +70,23 @@
 - name: Show resulting download URL on GitHub
   ansible.builtin.debug:
     msg: "url: {{ result_url }}"
+  when: downloader_debug | default(false)
+
+- name: Get list of all asset names for checksum detection
+  ansible.builtin.set_fact:
+    release_assets: "{{ (github_api_data_latest.json.assets | default([])) + (github_api_data_versioned.json.assets | default([])) }}"
+
+- name: Look for checksum file in assets (SHA256)
+  ansible.builtin.set_fact:
+    checksum_file_url: >-
+      {{ release_assets
+         | selectattr('name', 'match', '.*(SHA256SUMS|sha256sum|checksums\.txt|CHECKSUMS|checksum).*')
+         | map(attribute='browser_download_url')
+         | list
+         | first
+         | default('') }}
+
+- name: Show checksum file URL if found
+  ansible.builtin.debug:
+    msg: "Checksum file URL: {{ checksum_file_url if checksum_file_url else 'not found' }}"
   when: downloader_debug | default(false)

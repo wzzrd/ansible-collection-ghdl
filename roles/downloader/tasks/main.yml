@@ -17,11 +17,15 @@
     ansible.builtin.set_fact:
       downloader_tmp_dir: "{{ _tmp_dir.path }}"
 
+  - name: Prepare checksum for verification
+    ansible.builtin.include_tasks: tasks/prepare_checksum.yml
+
   - name: Download the file
     ansible.builtin.get_url:
       url: "{{ result_url }}"
       dest: "{{ downloader_tmp_dir }}"
       mode: '0640'
+      checksum: "{{ binary_checksum | default(omit) }}"
 
   - name: Handle archive
     ansible.builtin.include_tasks: tasks/handle_archive.yml
