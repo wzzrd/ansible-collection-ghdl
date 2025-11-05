@@ -1,0 +1,45 @@
+---
+- name: Download checksum file
+  ansible.builtin.get_url:
+    url: "{{ checksum_file_url }}"
+    dest: "{{ downloader_tmp_dir }}/CHECKSUMS"
+    mode: '0600'
+  register: checksum_download
+  when: checksum_file_url | length > 0
+
+- name: Read checksum file
+  ansible.builtin.slurp:
+    src: "{{ downloader_tmp_dir }}/CHECKSUMS"
+  register: checksum_file_content
+  when: checksum_download is succeeded
+
+- name: Extract binary filename from download URL
+  ansible.builtin.set_fact:
+    binary_filename: "{{ result_url | basename }}"
+
+- name: Parse checksum file to find hash for our binary
+  ansible.builtin.set_fact:
+    binary_hash: >-
+      {{
+        (checksum_file_content.content | b64decode).split('\n')
+        | select('search', binary_filename)
+        | map('regex_replace', '^\s*([a-fA-F0-9]+)\s+.*$', '\1')
+        | first
+        | default('')
+      }}
+  when: checksum_file_content is defined and checksum_file_content.content is defined
+
+- name: Set checksum for download verification
+  ansible.builtin.set_fact:
+    binary_checksum: "sha256:{{ binary_hash }}"
+  when: binary_hash is defined and binary_hash | length > 0
+
+- name: Show checksum that will be used
+  ansible.builtin.debug:
+    msg: "Will verify download with: {{ binary_checksum | default('no checksum - skipping verification') }}"
+  when: downloader_debug | default(false)
+
+- name: Warn if no checksum found
+  ansible.builtin.debug:
+    msg: "WARNING: No checksum file found for {{ downloader_project }}. Download will not be verified."
+  when: checksum_file_url | length == 0 or binary_hash is not defined or binary_hash | length == 0
