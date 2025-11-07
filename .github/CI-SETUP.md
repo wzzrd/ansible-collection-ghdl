@@ -6,11 +6,15 @@ This document explains how to set up and use the CI/CD pipeline for this Ansible
 
 The pipeline runs three types of tests:
 
-1. **Linting** - ansible-lint for code quality
+1. **Linting** - ansible-lint for code quality (installed via pip for Gitea compatibility)
 2. **Unit Tests** - pytest for filter plugin tests
 3. **Integration Tests** - Molecule tests for roles (currently starship)
 
 After all tests pass on the main branch, it automatically tags releases based on the version in `galaxy.yml`.
+
+### Why Direct pip Installation?
+
+The lint job installs ansible-lint directly via pip rather than using the `ansible/ansible-lint` GitHub Action. This ensures compatibility with both GitHub Actions and Gitea act_runner, as composite actions can have platform-specific behaviors.
 
 ## Container Engine Support
 
@@ -111,10 +115,31 @@ molecule test --driver-name docker
 ### Run Linting
 
 ```bash
+# Install ansible-lint
+pip install "ansible-lint>=24.9.0,<25.0" "ansible-core>=2.16,<2.18"
+
+# Run linting
 ansible-lint
+
+# Or with verbose output
+ansible-lint -v
 ```
 
+Configuration is in `.ansible-lint` at the repository root.
+
 ## Troubleshooting
+
+### Ansible-lint fails on Gitea act_runner
+
+If you see errors about composite actions or missing files in the lint job:
+
+**Issue**: The `ansible/ansible-lint` GitHub Action uses composite actions that may not work properly in Gitea act_runner.
+
+**Solution**: The workflow now installs ansible-lint directly via pip, which works on both platforms. If you still see issues:
+
+1. Ensure Python 3.11+ is available on your runner
+2. Check that pip can access PyPI (or configure a mirror)
+3. Verify the `.ansible-lint` config file is valid YAML
 
 ### Podman socket issues on GitHub Actions
 
