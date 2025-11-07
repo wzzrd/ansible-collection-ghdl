@@ -5,3 +5,4 @@ plugins/filter/__pycache__
 .envrc
 .vscode
 *.pyc
+.claude
