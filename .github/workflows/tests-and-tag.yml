@@ -8,7 +8,6 @@ env:
   # Version configuration (can be overridden with repository variables)
   ANSIBLE_CORE_VERSION: ${{ vars.ANSIBLE_CORE_VERSION || '2.16.13' }}
   ANSIBLE_LINT_VERSION: ${{ vars.ANSIBLE_LINT_VERSION || '24.9.2' }}
-  PYTHON_VERSION: ${{ vars.PYTHON_VERSION || '3.11' }}
   # Ansible Galaxy configuration for custom servers
   ANSIBLE_GALAXY_SERVER_LIST: ${{ vars.ANSIBLE_GALAXY_SERVER_LIST }}
   ANSIBLE_GALAXY_SERVER_RH_CERTIFIED_URL: ${{ vars.ANSIBLE_GALAXY_SERVER_RH_CERTIFIED_URL }}
@@ -21,33 +20,30 @@ env:
   ANSIBLE_GALAXY_SERVER_UPSTREAM_TOKEN: ${{ secrets.ANSIBLE_GALAXY_SERVER_UPSTREAM_TOKEN }}
   ANSIBLE_GALAXY_SERVER_COMMUNITY_TOKEN: ${{ secrets.ANSIBLE_GALAXY_SERVER_COMMUNITY_TOKEN }}
   ANSIBLE_GALAXY_SERVER_LOCAL_TOKEN: ${{ secrets.ANSIBLE_GALAXY_SERVER_LOCAL_TOKEN }}
+  PATH: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/root/.local/bin
 
 jobs:
   lint:
     name: Ansible Lint
     runs-on: ubuntu-latest
+    container:
+      image: node:18-bookworm
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-
       - name: Install pipx
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install --user pipx
-          python -m pipx ensurepath
+        run: apt update && apt -y install pipx
 
       - name: Install ansible-core
-        run: |
-          pipx install ansible-core==${{ env.ANSIBLE_CORE_VERSION }}
+        run: pipx install ansible-core==${{ env.ANSIBLE_CORE_VERSION }}
+        env:
+          PIPX_HOME: /root/.local/pipx
 
       - name: Install ansible-lint
-        run: |
-          pipx inject --include-apps ansible-core ansible-lint==${{ env.ANSIBLE_LINT_VERSION }}
+        run: pipx inject --include-apps ansible-core ansible-lint==${{ env.ANSIBLE_LINT_VERSION }}
+        env:
+          PIPX_HOME: /root/.local/pipx
 
       - name: Verify installation
         run: |
@@ -60,18 +56,17 @@ jobs:
   pytest:
     name: Unit Tests (pytest)
     runs-on: ubuntu-latest
+    container:
+      image: node:18-bookworm
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-          cache: 'pip'
+      - name: Install pip
+        run: apt update && apt -y install python3-pip
 
       - name: Install test dependencies
-        run: pip install -r tests/requirements.txt
+        run: pip3 install -r tests/requirements.txt --break-system-packages
 
       - name: Run pytest
         run: pytest tests/unit/ -v --tb=short --color=yes
@@ -91,11 +86,6 @@ jobs:
         uses: actions/checkout@v4
         with:
           path: ansible_collections/wzzrd/ghdl
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Detect and setup container engine
         id: container-engine
@@ -137,17 +127,20 @@ jobs:
           $ENGINE version
           $ENGINE info
 
-      - name: Install pipx
+      - name: Install Python and pipx
         run: |
-          python -m pip install --upgrade pip
-          python -m pip install --user pipx
-          python -m pipx ensurepath
+          sudo apt-get update
+          sudo apt-get -y install python3 python3-pip pipx
+          pipx ensurepath
 
       - name: Install Ansible and Molecule
         run: |
           pipx install ansible-core==${{ env.ANSIBLE_CORE_VERSION }}
           pipx inject ansible-core molecule
           pipx inject ansible-core "molecule-plugins[podman]"
+        env:
+          PIPX_HOME: /opt/pipx
+          PIPX_BIN_DIR: /usr/local/bin
 
       - name: Verify installation
         run: |

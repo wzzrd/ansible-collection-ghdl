@@ -12,15 +12,26 @@ The pipeline runs three types of tests:
 
 After all tests pass on the main branch, it automatically tags releases based on the version in `galaxy.yml`.
 
+### Why node:18-bookworm Container?
+
+The **lint** and **pytest** jobs run inside a `node:18-bookworm` container. This approach:
+
+- ✅ Works on both x86_64 and ARM64 architectures (no setup-python issues)
+- ✅ Provides a consistent environment on GitHub Actions and Gitea act_runner
+- ✅ Includes Python 3.11 pre-installed
+- ✅ Allows installing pipx via apt (native package manager)
+- ✅ Matches your proven `lint_and_merge.yml` pattern
+
+**Note:** The **molecule** job does NOT use a container because it needs to manage containers itself (for testing). It runs directly on the ubuntu-latest runner and installs dependencies via apt.
+
 ### Why pipx?
 
 The workflow uses **pipx** instead of pip to install ansible-core and ansible-lint. This approach:
 
 - ✅ Creates isolated environments for each tool (no dependency conflicts)
-- ✅ Works identically on GitHub Actions and Gitea act_runner
-- ✅ Matches your proven `lint_and_merge.yml` pattern
+- ✅ Installed via apt (native Debian package)
 - ✅ Uses `pipx inject` to add ansible-lint to the ansible-core environment
-- ✅ Avoids issues with composite GitHub Actions on Gitea
+- ✅ More reliable than pip for system-wide tool installation
 
 ### Version Configuration
 
@@ -34,6 +45,15 @@ All tool versions are configurable via repository variables:
 | `CI_CONTAINER_ENGINE` | `podman` | Container engine (podman/docker) |
 
 To override, set these as repository or organization variables in GitHub/Gitea.
+
+### Job Architecture Summary
+
+| Job | Runs In | Python Setup | Why? |
+|-----|---------|--------------|------|
+| **lint** | `node:18-bookworm` container | Pre-installed (3.11) | Consistent across architectures, avoids setup-python issues |
+| **pytest** | `node:18-bookworm` container | Pre-installed (3.11) | Same benefits as lint job |
+| **molecule** | `ubuntu-latest` runner | Installed via apt | Needs to manage containers, can't run in container |
+| **tag-release** | `ubuntu-latest` runner | Not needed | Only runs shell commands |
 
 ### Ansible Galaxy Server Configuration
 
@@ -122,12 +142,36 @@ Don't set the `CI_CONTAINER_ENGINE` variable, and the pipeline will:
 
 ## Testing Locally
 
-### Prerequisites
+### Option 1: Using Container (Recommended - Matches CI)
 
 ```bash
-# Install pipx (if not already installed)
-python -m pip install --user pipx
-python -m pipx ensurepath
+# Pull the container image
+docker pull node:18-bookworm
+# or
+podman pull node:18-bookworm
+
+# Run tests in container
+docker run -it --rm -v $(pwd):/workspace -w /workspace node:18-bookworm bash
+
+# Inside container:
+apt update && apt -y install pipx git
+export PIPX_HOME=/root/.local/pipx
+pipx install ansible-core==2.16.13
+pipx inject --include-apps ansible-core ansible-lint==24.9.2
+ansible-lint -v
+```
+
+### Option 2: Native Installation
+
+```bash
+# Install pipx via apt (Debian/Ubuntu)
+sudo apt-get update
+sudo apt-get install pipx
+pipx ensurepath
+
+# Or via pip (macOS/other)
+python3 -m pip install --user pipx
+python3 -m pipx ensurepath
 
 # Install ansible-core
 pipx install ansible-core==2.16.13
@@ -140,9 +184,9 @@ pipx inject ansible-core molecule
 pipx inject ansible-core "molecule-plugins[podman]"
 
 # Install pytest dependencies
-pip install -r tests/requirements.txt
+pip3 install -r tests/requirements.txt
 
-# Install container engine
+# Install container engine (for molecule tests)
 sudo apt-get install podman  # Debian/Ubuntu
 # or
 brew install podman           # macOS
@@ -180,45 +224,61 @@ Configuration is in `.ansible-lint` at the repository root.
 
 ## Troubleshooting
 
-### Ansible-lint fails on Gitea act_runner
+### Python setup fails with ARM64 architecture error
 
-If you see errors about composite actions or missing files in the lint job:
+**Issue**: `actions/setup-python@v5` fails with "Version '3.11' with architecture 'arm64' was not found"
 
-**Issue**: The `ansible/ansible-lint` GitHub Action uses composite actions that may not work properly in Gitea act_runner.
+**Solution**: ✅ Fixed! The workflow now uses `node:18-bookworm` container which includes Python and works on all architectures. No `setup-python` action needed.
 
-**Solution**: The workflow now uses pipx to install ansible-lint, matching your proven `lint_and_merge.yml` pattern. If you still see issues:
+### Ansible-lint fails in container
 
-1. Ensure Python 3.11+ is available on your runner
-2. Check that pipx can access PyPI (or configure a mirror)
-3. Verify pipx is working: `python -m pip install --user pipx`
-4. Check the `.ansible-lint` config file is valid YAML
-
-### pipx command not found
-
-**Issue**: `pipx: command not found` during workflow execution
+**Issue**: ansible-lint can't find files or has permission issues
 
 **Solution**:
 ```bash
-# The workflow installs pipx via pip
-python -m pip install --user pipx
-python -m pipx ensurepath
+# Ensure checkout happened before running in container
+# The workflow uses container: image: node:18-bookworm at job level
+# Checkout action runs inside the container automatically
 
-# Then use it to install tools
-pipx install ansible-core==2.16.13
+# If running manually, mount the workspace:
+docker run -v $(pwd):/workspace -w /workspace node:18-bookworm bash
 ```
 
-### pipx inject fails
+### pipx command not found in container
 
-**Issue**: `pipx inject` fails with dependency errors
+**Issue**: `pipx: command not found` in the container
 
 **Solution**:
 ```bash
-# Ensure the base package is installed first
-pipx install ansible-core==2.16.13
+# Install pipx via apt (included in workflow)
+apt update && apt -y install pipx
 
-# Then inject with --include-apps flag
-pipx inject --include-apps ansible-core ansible-lint==24.9.2
+# Set PIPX_HOME for consistent location
+export PIPX_HOME=/root/.local/pipx
 ```
+
+### pip install fails with externally-managed-environment
+
+**Issue**: `error: externally-managed-environment` when using pip in Debian bookworm
+
+**Solution**: The workflow uses `--break-system-packages` flag:
+```bash
+pip3 install -r tests/requirements.txt --break-system-packages
+```
+
+Or use pipx for isolated installations:
+```bash
+pipx install package-name
+```
+
+### Container can't be pulled
+
+**Issue**: `docker pull node:18-bookworm` fails
+
+**Solution**:
+1. Check internet connectivity
+2. For Gitea act_runner, ensure Docker/Podman has access to Docker Hub
+3. Or configure a local registry mirror
 
 ### Podman socket issues on GitHub Actions
 
