@@ -1,0 +1,132 @@
+name: Lint, test and tag
+
+on: push
+
+env:
+  # Allow override for Gitea runners that prefer specific container engine
+  CONTAINER_ENGINE: ${{ vars.CI_CONTAINER_ENGINE || 'podman' }}
+
+jobs:
+  lint:
+    name: Ansible Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run ansible-lint
+        uses: ansible/ansible-lint@v24.9.0
+
+  pytest:
+    name: Unit Tests (pytest)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install test dependencies
+        run: pip install -r tests/requirements.txt
+
+      - name: Run pytest
+        run: pytest tests/unit/ -v --tb=short --color=yes
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+
+  molecule:
+    name: Integration Tests (Molecule)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        role:
+          - starship
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          path: ansible_collections/wzzrd/ghdl
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Detect and setup container engine
+        id: container-engine
+        run: |
+          ENGINE="${{ env.CONTAINER_ENGINE }}"
+
+          # Auto-detect if not set or set to 'auto'
+          if [ "$ENGINE" = "auto" ] || [ -z "$ENGINE" ]; then
+            if command -v podman &> /dev/null; then
+              ENGINE="podman"
+            elif command -v docker &> /dev/null; then
+              ENGINE="docker"
+            else
+              echo "ERROR: Neither podman nor docker found"
+              exit 1
+            fi
+          fi
+
+          echo "engine=$ENGINE" >> $GITHUB_OUTPUT
+          echo "Using container engine: $ENGINE"
+
+      - name: Install Podman (GitHub Actions)
+        if: steps.container-engine.outputs.engine == 'podman' && !contains(github.server_url, 'gitea')
+        run: |
+          sudo apt-get update
+          sudo apt-get -y install podman
+          podman version
+
+          # Start podman socket for molecule
+          systemctl --user enable --now podman.socket
+          systemctl --user status podman.socket || true
+
+          # Set environment for rootless podman
+          echo "DOCKER_HOST=unix:///run/user/$(id -u)/podman/podman.sock" >> $GITHUB_ENV
+
+      - name: Verify container engine
+        run: |
+          ENGINE="${{ steps.container-engine.outputs.engine }}"
+          $ENGINE version
+          $ENGINE info
+
+      - name: Install Ansible and Molecule
+        run: |
+          python -m pip install --upgrade pip
+          pip install "ansible-core>=2.16,<2.18" "molecule>=6.0" "molecule-plugins[podman]>=23.5"
+
+      - name: Run Molecule tests
+        run: molecule test
+        working-directory: ansible_collections/wzzrd/ghdl/roles/${{ matrix.role }}
+        env:
+          ANSIBLE_FORCE_COLOR: '1'
+          MOLECULE_DRIVER: ${{ steps.container-engine.outputs.engine }}
+          PY_COLORS: '1'
+
+  tag-release:
+    name: Tag new release
+    runs-on: ubuntu-latest
+    needs:
+      - lint
+      - pytest
+      - molecule
+    # Only tag on main branch
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect and tag new version
+        uses: salsify/action-detect-and-tag-new-version@v2
+        with:
+          version-command: |
+            awk '/^version:/ { print $2 }' galaxy.yml | tr -d '"'

@@ -1,8 +1,12 @@
 ---
+driver:
+  name: podman
+
 dependency:
   name: galaxy
   options:
     requirements-file: requirements.yml
+
 platforms:
   - name: ubi8
     image: registry.access.redhat.com/ubi8/ubi-init:latest
@@ -21,11 +25,13 @@ platforms:
     privileged: true
     command: "/usr/sbin/init"
     platform: linux/amd64
+
 provisioner:
   name: ansible
   inventory:
     host_vars:
       ubi8:
         starship_libc: "musl"
+
 verifier:
   name: ansible
