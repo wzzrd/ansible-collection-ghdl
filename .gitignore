@@ -4,3 +4,4 @@ plugins/filter/__pycache__
 .devcontainer
 .envrc
 .vscode
+*.pyc
