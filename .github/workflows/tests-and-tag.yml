@@ -3,8 +3,24 @@ name: Lint, test and tag
 on: push
 
 env:
-  # Allow override for Gitea runners that prefer specific container engine
+  # Container engine configuration
   CONTAINER_ENGINE: ${{ vars.CI_CONTAINER_ENGINE || 'podman' }}
+  # Version configuration (can be overridden with repository variables)
+  ANSIBLE_CORE_VERSION: ${{ vars.ANSIBLE_CORE_VERSION || '2.16.13' }}
+  ANSIBLE_LINT_VERSION: ${{ vars.ANSIBLE_LINT_VERSION || '24.9.2' }}
+  PYTHON_VERSION: ${{ vars.PYTHON_VERSION || '3.11' }}
+  # Ansible Galaxy configuration for custom servers
+  ANSIBLE_GALAXY_SERVER_LIST: ${{ vars.ANSIBLE_GALAXY_SERVER_LIST }}
+  ANSIBLE_GALAXY_SERVER_RH_CERTIFIED_URL: ${{ vars.ANSIBLE_GALAXY_SERVER_RH_CERTIFIED_URL }}
+  ANSIBLE_GALAXY_SERVER_VALIDATED_URL: ${{ vars.ANSIBLE_GALAXY_SERVER_VALIDATED_URL }}
+  ANSIBLE_GALAXY_SERVER_UPSTREAM_URL: ${{ vars.ANSIBLE_GALAXY_SERVER_UPSTREAM_URL }}
+  ANSIBLE_GALAXY_SERVER_COMMUNITY_URL: ${{ vars.ANSIBLE_GALAXY_SERVER_COMMUNITY_URL }}
+  ANSIBLE_GALAXY_SERVER_LOCAL_URL: ${{ vars.ANSIBLE_GALAXY_SERVER_LOCAL_URL }}
+  ANSIBLE_GALAXY_SERVER_RH_CERTIFIED_TOKEN: ${{ secrets.ANSIBLE_GALAXY_SERVER_RH_CERTIFIED_TOKEN }}
+  ANSIBLE_GALAXY_SERVER_VALIDATED_TOKEN: ${{ secrets.ANSIBLE_GALAXY_SERVER_VALIDATED_TOKEN }}
+  ANSIBLE_GALAXY_SERVER_UPSTREAM_TOKEN: ${{ secrets.ANSIBLE_GALAXY_SERVER_UPSTREAM_TOKEN }}
+  ANSIBLE_GALAXY_SERVER_COMMUNITY_TOKEN: ${{ secrets.ANSIBLE_GALAXY_SERVER_COMMUNITY_TOKEN }}
+  ANSIBLE_GALAXY_SERVER_LOCAL_TOKEN: ${{ secrets.ANSIBLE_GALAXY_SERVER_LOCAL_TOKEN }}
 
 jobs:
   lint:
@@ -17,24 +33,29 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
-          cache: 'pip'
+          python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: Cache ansible-lint dependencies
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-ansible-lint-${{ hashFiles('**/galaxy.yml') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-ansible-lint-
+      - name: Install pipx
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install --user pipx
+          python -m pipx ensurepath
+
+      - name: Install ansible-core
+        run: |
+          pipx install ansible-core==${{ env.ANSIBLE_CORE_VERSION }}
 
       - name: Install ansible-lint
         run: |
-          python -m pip install --upgrade pip
-          pip install "ansible-lint>=24.9.0,<25.0" "ansible-core>=2.16,<2.18"
+          pipx inject --include-apps ansible-core ansible-lint==${{ env.ANSIBLE_LINT_VERSION }}
+
+      - name: Verify installation
+        run: |
+          ansible --version
+          ansible-lint --version
 
       - name: Run ansible-lint
-        run: ansible-lint --version && ansible-lint
+        run: ansible-lint -v
 
   pytest:
     name: Unit Tests (pytest)
@@ -46,7 +67,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: ${{ env.PYTHON_VERSION }}
           cache: 'pip'
 
       - name: Install test dependencies
@@ -74,7 +95,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Detect and setup container engine
         id: container-engine
@@ -116,17 +137,28 @@ jobs:
           $ENGINE version
           $ENGINE info
 
-      - name: Install Ansible and Molecule
+      - name: Install pipx
         run: |
           python -m pip install --upgrade pip
-          pip install "ansible-core>=2.16,<2.18" "molecule>=6.0" "molecule-plugins[podman]>=23.5"
+          python -m pip install --user pipx
+          python -m pipx ensurepath
+
+      - name: Install Ansible and Molecule
+        run: |
+          pipx install ansible-core==${{ env.ANSIBLE_CORE_VERSION }}
+          pipx inject ansible-core molecule
+          pipx inject ansible-core "molecule-plugins[podman]"
+
+      - name: Verify installation
+        run: |
+          ansible --version
+          molecule --version
 
       - name: Run Molecule tests
         run: molecule test
         working-directory: ansible_collections/wzzrd/ghdl/roles/${{ matrix.role }}
         env:
           ANSIBLE_FORCE_COLOR: '1'
-          MOLECULE_DRIVER: ${{ steps.container-engine.outputs.engine }}
           PY_COLORS: '1'
 
   tag-release:

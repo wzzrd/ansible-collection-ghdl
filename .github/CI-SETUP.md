@@ -6,15 +6,55 @@ This document explains how to set up and use the CI/CD pipeline for this Ansible
 
 The pipeline runs three types of tests:
 
-1. **Linting** - ansible-lint for code quality (installed via pip for Gitea compatibility)
+1. **Linting** - ansible-lint for code quality (installed via pipx)
 2. **Unit Tests** - pytest for filter plugin tests
 3. **Integration Tests** - Molecule tests for roles (currently starship)
 
 After all tests pass on the main branch, it automatically tags releases based on the version in `galaxy.yml`.
 
-### Why Direct pip Installation?
+### Why pipx?
 
-The lint job installs ansible-lint directly via pip rather than using the `ansible/ansible-lint` GitHub Action. This ensures compatibility with both GitHub Actions and Gitea act_runner, as composite actions can have platform-specific behaviors.
+The workflow uses **pipx** instead of pip to install ansible-core and ansible-lint. This approach:
+
+- ✅ Creates isolated environments for each tool (no dependency conflicts)
+- ✅ Works identically on GitHub Actions and Gitea act_runner
+- ✅ Matches your proven `lint_and_merge.yml` pattern
+- ✅ Uses `pipx inject` to add ansible-lint to the ansible-core environment
+- ✅ Avoids issues with composite GitHub Actions on Gitea
+
+### Version Configuration
+
+All tool versions are configurable via repository variables:
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `ANSIBLE_CORE_VERSION` | `2.16.13` | ansible-core version |
+| `ANSIBLE_LINT_VERSION` | `24.9.2` | ansible-lint version |
+| `PYTHON_VERSION` | `3.11` | Python interpreter version |
+| `CI_CONTAINER_ENGINE` | `podman` | Container engine (podman/docker) |
+
+To override, set these as repository or organization variables in GitHub/Gitea.
+
+### Ansible Galaxy Server Configuration
+
+The workflow supports custom Ansible Galaxy servers (useful for private/enterprise Galaxy instances). Configure via repository variables/secrets:
+
+**Variables:**
+- `ANSIBLE_GALAXY_SERVER_LIST` - Comma-separated list of server names
+- `ANSIBLE_GALAXY_SERVER_RH_CERTIFIED_URL` - Red Hat Certified server URL
+- `ANSIBLE_GALAXY_SERVER_VALIDATED_URL` - Validated content server URL
+- `ANSIBLE_GALAXY_SERVER_UPSTREAM_URL` - Upstream server URL
+- `ANSIBLE_GALAXY_SERVER_COMMUNITY_URL` - Community server URL
+- `ANSIBLE_GALAXY_SERVER_LOCAL_URL` - Local/private server URL
+
+**Secrets:**
+- `ANSIBLE_GALAXY_SERVER_RH_CERTIFIED_TOKEN` - Auth token for RH Certified
+- `ANSIBLE_GALAXY_SERVER_VALIDATED_TOKEN` - Auth token for Validated
+- `ANSIBLE_GALAXY_SERVER_UPSTREAM_TOKEN` - Auth token for Upstream
+- `ANSIBLE_GALAXY_SERVER_COMMUNITY_TOKEN` - Auth token for Community
+- `ANSIBLE_GALAXY_SERVER_LOCAL_TOKEN` - Auth token for Local
+
+If these are not set, the workflow uses the default public Ansible Galaxy server.
 
 ## Container Engine Support
 
@@ -85,14 +125,28 @@ Don't set the `CI_CONTAINER_ENGINE` variable, and the pipeline will:
 ### Prerequisites
 
 ```bash
-# Install dependencies
-pip install -r tests/requirements.txt
-pip install "molecule>=6.0" "molecule-plugins[podman]>=23.5"
+# Install pipx (if not already installed)
+python -m pip install --user pipx
+python -m pipx ensurepath
 
-# Install podman (or use docker)
+# Install ansible-core
+pipx install ansible-core==2.16.13
+
+# Install ansible-lint
+pipx inject --include-apps ansible-core ansible-lint==24.9.2
+
+# Install molecule for integration tests
+pipx inject ansible-core molecule
+pipx inject ansible-core "molecule-plugins[podman]"
+
+# Install pytest dependencies
+pip install -r tests/requirements.txt
+
+# Install container engine
 sudo apt-get install podman  # Debian/Ubuntu
 # or
 brew install podman           # macOS
+# or use docker
 ```
 
 ### Run Unit Tests
@@ -115,14 +169,11 @@ molecule test --driver-name docker
 ### Run Linting
 
 ```bash
-# Install ansible-lint
-pip install "ansible-lint>=24.9.0,<25.0" "ansible-core>=2.16,<2.18"
-
-# Run linting
-ansible-lint
-
-# Or with verbose output
+# Run ansible-lint on entire collection
 ansible-lint -v
+
+# Run on specific files
+ansible-lint roles/starship/tasks/main.yml
 ```
 
 Configuration is in `.ansible-lint` at the repository root.
@@ -135,11 +186,39 @@ If you see errors about composite actions or missing files in the lint job:
 
 **Issue**: The `ansible/ansible-lint` GitHub Action uses composite actions that may not work properly in Gitea act_runner.
 
-**Solution**: The workflow now installs ansible-lint directly via pip, which works on both platforms. If you still see issues:
+**Solution**: The workflow now uses pipx to install ansible-lint, matching your proven `lint_and_merge.yml` pattern. If you still see issues:
 
 1. Ensure Python 3.11+ is available on your runner
-2. Check that pip can access PyPI (or configure a mirror)
-3. Verify the `.ansible-lint` config file is valid YAML
+2. Check that pipx can access PyPI (or configure a mirror)
+3. Verify pipx is working: `python -m pip install --user pipx`
+4. Check the `.ansible-lint` config file is valid YAML
+
+### pipx command not found
+
+**Issue**: `pipx: command not found` during workflow execution
+
+**Solution**:
+```bash
+# The workflow installs pipx via pip
+python -m pip install --user pipx
+python -m pipx ensurepath
+
+# Then use it to install tools
+pipx install ansible-core==2.16.13
+```
+
+### pipx inject fails
+
+**Issue**: `pipx inject` fails with dependency errors
+
+**Solution**:
+```bash
+# Ensure the base package is installed first
+pipx install ansible-core==2.16.13
+
+# Then inject with --include-apps flag
+pipx inject --include-apps ansible-core ansible-lint==24.9.2
+```
 
 ### Podman socket issues on GitHub Actions
 
@@ -196,11 +275,37 @@ To add a new role to the Molecule test matrix:
 
 ## Environment Variables Reference
 
-| Variable | Purpose | Default | Where to Set |
-|----------|---------|---------|--------------|
-| `CI_CONTAINER_ENGINE` | Force specific engine | `podman` | Gitea repo/org vars |
-| `DOCKER_HOST` | Podman socket path | Auto-detected | Set by workflow |
-| `MOLECULE_DRIVER` | Override molecule driver | From detection | Set by workflow |
+### User-Configurable Variables
+
+Set these in your GitHub/Gitea repository or organization settings:
+
+| Variable | Purpose | Default |
+|----------|---------|---------|
+| `ANSIBLE_CORE_VERSION` | ansible-core version to install | `2.16.13` |
+| `ANSIBLE_LINT_VERSION` | ansible-lint version to install | `24.9.2` |
+| `PYTHON_VERSION` | Python interpreter version | `3.11` |
+| `CI_CONTAINER_ENGINE` | Container engine (podman/docker/auto) | `podman` |
+| `ANSIBLE_GALAXY_SERVER_LIST` | Custom Galaxy servers (comma-separated) | _(empty)_ |
+| `ANSIBLE_GALAXY_SERVER_*_URL` | URLs for custom Galaxy servers | _(empty)_ |
+
+### User-Configurable Secrets
+
+Set these in your GitHub/Gitea secrets:
+
+| Secret | Purpose |
+|--------|---------|
+| `ANSIBLE_GALAXY_SERVER_*_TOKEN` | Authentication tokens for custom Galaxy servers |
+
+### Workflow-Managed Variables
+
+These are set automatically by the workflow:
+
+| Variable | Purpose | Set By |
+|----------|---------|--------|
+| `DOCKER_HOST` | Podman socket path | Workflow (when using Podman) |
+| `PYTHONPATH` | Python module search path | Workflow (pytest job) |
+| `ANSIBLE_FORCE_COLOR` | Enable colored output | Workflow (molecule job) |
+| `PY_COLORS` | Enable Python colored output | Workflow (molecule job) |
 
 ## GitHub Actions vs Gitea act_runner Compatibility
 
