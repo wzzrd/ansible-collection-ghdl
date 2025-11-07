@@ -3,16 +3,22 @@ dependency:
   name: galaxy
   options:
     requirements-file: requirements.yml
+
+scenario:
+  name: default
+  test_sequence:
+    - dependency
+    - cleanup
+    - destroy
+    - syntax
+    - create
+    - prepare
+    - converge
+    - verify
+    - cleanup
+    - destroy
+
 platforms:
-  - name: ubi8
-    image: registry.access.redhat.com/ubi8/ubi-init:latest
-    pre_build_image: true
-    volumes:
-      - /sys/fs/cgroup:/sys/fs/cgroup:ro
-    privileged: true
-    command: "/usr/sbin/init"
-    platform: linux/amd64
-    cgroupns_mode: host
   - name: ubi9
     image: registry.access.redhat.com/ubi9/ubi-init:latest
     pre_build_image: true
@@ -22,6 +28,17 @@ platforms:
     privileged: true
     command: "/usr/sbin/init"
     platform: linux/amd64
+
+  - name: ubi10
+    image: registry.access.redhat.com/ubi10/ubi-init:latest
+    pre_build_image: true
+    cgroupns_mode: host
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+    privileged: true
+    command: "/usr/sbin/init"
+    platform: linux/amd64
+
 driver:
   name: podman
   options:
@@ -29,16 +46,25 @@ driver:
     login_cmd_template: "podman exec -it {instance} bash"
     ansible_connection_options:
       ansible_connection: podman
+
 provisioner:
   name: ansible
+  playbooks:
+    create: create.yml
+    prepare: prepare.yml
+    converge: converge.yml
+    verify: verify.yml
+    cleanup: cleanup.yml
+    destroy: destroy.yml
   inventory:
     group_vars:
       all:
         downloader_github_token: "{{ lookup('ansible.builtin.env', 'GITHUB_PAT') }}"
     host_vars:
-      ubi8:
-        ansible_python_interpreter: /usr/libexec/platform-python
       ubi9:
         ansible_python_interpreter: /usr/bin/python3
+      ubi10:
+        ansible_python_interpreter: /usr/bin/python3
+
 verifier:
   name: ansible

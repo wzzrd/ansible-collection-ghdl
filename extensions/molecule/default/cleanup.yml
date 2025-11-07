@@ -1,0 +1,12 @@
+---
+- name: Cleanup
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  tasks:
+    - name: Cleanup ephemeral directory
+      ansible.builtin.file:
+        path: "{{ molecule_ephemeral_directory }}"
+        state: absent
+      when: molecule_ephemeral_directory is defined

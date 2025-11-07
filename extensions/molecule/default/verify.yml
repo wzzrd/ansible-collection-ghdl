@@ -1,0 +1,29 @@
+---
+- name: Verify
+  hosts: all
+  gather_facts: false
+
+  tasks:
+    - name: Verify starship binary installation
+      block:
+        - name: Check if starship binary exists
+          ansible.builtin.stat:
+            path: /usr/local/bin/starship
+          register: starship_stat_result
+
+        - name: Assert that starship binary exists
+          ansible.builtin.assert:
+            that:
+              - starship_stat_result.stat.exists
+            fail_msg: "Starship binary not found at /usr/local/bin/starship"
+            success_msg: "Starship binary successfully installed"
+
+        - name: Verify starship is executable
+          ansible.builtin.command:
+            cmd: starship --version
+          changed_when: false
+          register: starship_version
+
+        - name: Display starship version
+          ansible.builtin.debug:
+            msg: "Installed starship version: {{ starship_version.stdout }}"

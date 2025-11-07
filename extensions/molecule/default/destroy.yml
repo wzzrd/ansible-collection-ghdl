@@ -1,0 +1,44 @@
+---
+- name: Destroy
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  no_log: "{{ molecule_no_log }}"
+
+  tasks:
+    - name: Check if containers exist
+      containers.podman.podman_container_info:
+        name: "{{ item.name }}"
+      loop: "{{ molecule_yml.platforms }}"
+      register: container_info
+      failed_when: false
+
+    - name: Stop and remove molecule instance(s)
+      containers.podman.podman_container:
+        name: "{{ item.name }}"
+        state: absent
+        force_delete: true
+      loop: "{{ molecule_yml.platforms }}"
+      when: container_info.results | selectattr('containers', 'defined') | list | length > 0
+      register: server
+      async: 7200
+      poll: 0
+
+    - name: Wait for instance(s) deletion to complete
+      ansible.builtin.async_status:
+        jid: "{{ item.ansible_job_id }}"
+      register: podman_jobs
+      until: podman_jobs.finished
+      retries: 300
+      delay: 1
+      loop: "{{ server.results }}"
+      when: server is changed
+
+    - name: Remove container images
+      containers.podman.podman_image:
+        name: "molecule_local/{{ item.name }}"
+        state: absent
+        force: true
+      loop: "{{ molecule_yml.platforms }}"
+      register: image_removal
+      failed_when: false

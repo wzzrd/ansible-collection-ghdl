@@ -1,0 +1,69 @@
+---
+- name: Create
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  no_log: "{{ molecule_no_log }}"
+
+  tasks:
+    - name: Log into container registries
+      containers.podman.podman_login:
+        username: "{{ item.registry.credentials.username }}"
+        password: "{{ item.registry.credentials.password }}"
+        registry: "{{ item.registry.url }}"
+      with_items: "{{ molecule_yml.platforms }}"
+      when:
+        - item.registry is defined
+        - item.registry.credentials is defined
+        - item.registry.credentials.username is defined
+
+    - name: Discover local Podman images
+      containers.podman.podman_image_info:
+        name: "molecule_local/{{ item.name }}"
+      loop: "{{ molecule_yml.platforms }}"
+      register: podman_images
+
+    - name: Build container images
+      containers.podman.podman_image:
+        name: "molecule_local/{{ item.item.name }}"
+        path: "{{ molecule_scenario_directory }}"
+        force: "{{ item.item.force | default(false) }}"
+        build:
+          cache: "{{ item.item.build_cache | default(true) }}"
+          file: "{{ molecule_scenario_directory }}/Containerfile.{{ item.item.image | regex_replace('[^a-zA-Z0-9_]', '_') }}"
+      loop: "{{ podman_images.results }}"
+      when: item.images | length == 0
+
+    - name: Create molecule instance(s)
+      containers.podman.podman_container:
+        name: "{{ item.name }}"
+        hostname: "{{ item.name }}"
+        image: "molecule_local/{{ item.name }}"
+        state: started
+        recreate: false
+        log_driver: json-file
+        command: "{{ item.command | default('bash -c \"while true; do sleep 10000; done\"') }}"
+        privileged: "{{ item.privileged | default(omit) }}"
+        volumes: "{{ item.volumes | default(omit) }}"
+        capabilities: "{{ item.capabilities | default(omit) }}"
+        exposed_ports: "{{ item.exposed_ports | default(omit) }}"
+        published_ports: "{{ item.published_ports | default(omit) }}"
+        ulimits: "{{ item.ulimits | default(omit) }}"
+        network: "{{ item.network | default(omit) }}"
+        dns_servers: "{{ item.dns_servers | default(omit) }}"
+        etc_hosts: "{{ item.etc_hosts | default(omit) }}"
+        env: "{{ item.env | default(omit) }}"
+        cgroupns: "{{ item.cgroupns_mode | default(omit) }}"
+      register: server
+      loop: "{{ molecule_yml.platforms }}"
+      async: 7200
+      poll: 0
+
+    - name: Wait for instance(s) creation to complete
+      ansible.builtin.async_status:
+        jid: "{{ item.ansible_job_id }}"
+      register: podman_jobs
+      until: podman_jobs.finished
+      retries: 300
+      delay: 1
+      loop: "{{ server.results }}"

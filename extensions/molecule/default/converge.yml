@@ -1,20 +1,21 @@
+---
 - name: Converge
   hosts: all
-  # We disable gather facts because it would fail due to our container not
-  # having python installed. This will not prevent use from running 'raw'
-  # commands. Most molecule users are expected to use containers that already
-  # have python installed in order to avoid notable delays installing it.
   gather_facts: false
+
   pre_tasks:
     - name: Gather required subset of facts
       ansible.builtin.setup:
         gather_subset:
           - '!all'
+          - '!min'
           - architecture
+          - system
 
   roles:
-    - role: downloader
+    - role: wzzrd.ghdl.downloader
       vars:
         downloader_organization: starship
         downloader_project: starship
         downloader_version: v1.21.1
+        downloader_github_token: "{{ lookup('ansible.builtin.env', 'GITHUB_PAT') }}"
