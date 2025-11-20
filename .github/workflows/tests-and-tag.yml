@@ -175,6 +175,8 @@ jobs:
         env:
           ANSIBLE_FORCE_COLOR: '1'
           PY_COLORS: '1'
+          ANSIBLE_COLLECTIONS_PATH: ${{ github.workspace }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   tag-release:
     name: Tag new release
