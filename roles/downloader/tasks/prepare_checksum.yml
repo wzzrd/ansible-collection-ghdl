@@ -1,17 +1,50 @@
 ---
-- name: Download checksum file
+- name: Clear all checksum-related variables from previous iterations
+  ansible.builtin.set_fact:
+    binary_checksum: ""
+    checksum_file_content: ""
+    checksum_lines: []
+    checksum_line: ""
+    binary_hash: ""
+
+- name: Check if checksum file already downloaded
+  ansible.builtin.stat:
+    path: "{{ downloader_tmp_dir }}/CHECKSUMS"
+  register: checksum_file_exists
+  when: checksum_file_url | length > 0
+  delegate_to: localhost
+  become: false
+
+- name: Download checksum file to localhost
   ansible.builtin.get_url:
     url: "{{ checksum_file_url }}"
     dest: "{{ downloader_tmp_dir }}/CHECKSUMS"
     mode: '0600'
   register: checksum_download
-  when: checksum_file_url | length > 0
+  when:
+    - checksum_file_url | length > 0
+    - not checksum_file_exists.stat.exists
+  delegate_to: localhost
+  become: false
+  throttle: 1
 
-- name: Read checksum file
+- name: Set checksum_download for skipped hosts
+  ansible.builtin.set_fact:
+    checksum_download:
+      skipped: false
+  when:
+    - checksum_file_url | length > 0
+    - checksum_file_exists.stat.exists
+
+- name: Read checksum file from localhost
   ansible.builtin.slurp:
     src: "{{ downloader_tmp_dir }}/CHECKSUMS"
   register: checksum_file_content
-  when: checksum_download is succeeded and checksum_download is not skipped
+  when:
+    - checksum_file_url | length > 0
+    - checksum_file_exists.stat.exists or (checksum_download is succeeded and checksum_download is not skipped)
+  delegate_to: localhost
+  become: false
 
 - name: Extract binary filename from download URL
   ansible.builtin.set_fact:

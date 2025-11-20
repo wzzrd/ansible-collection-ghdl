@@ -1,30 +1,81 @@
 ---
-- name: Extract file
+- name: Gather facts for localhost if not already collected
+  ansible.builtin.setup:
+  delegate_to: localhost
+  delegate_facts: true
+  run_once: true
+  become: false
+  when: hostvars['localhost'].ansible_os_family is not defined
+
+- name: Check if extraction marker exists
+  ansible.builtin.stat:
+    path: "{{ downloader_tmp_dir }}/.extracted"
+  register: extraction_marker
+  delegate_to: localhost
+  become: false
+
+- name: Extract file on localhost (using gtar on macOS)
   ansible.builtin.unarchive:
-    src: "{{ downloader_tmp_dir ~ '/' ~ result_url | basename }}"
+    src: "{{ download_result.dest }}"
     dest: "{{ downloader_tmp_dir }}"
     remote_src: true
-  when: result_url is not search('(?<!tar)\.bz2$')
+  environment:
+    TAR: "{{ 'gtar' if hostvars['localhost'].ansible_os_family == 'Darwin' else 'tar' }}"
+  when:
+    - result_url is not search('(?<!tar)\.bz2$')
+    - not extraction_marker.stat.exists
+  delegate_to: localhost
+  become: false
+  throttle: 1
 
-- name: Extract plain bz2 file
+- name: Create extraction marker
+  ansible.builtin.file:
+    path: "{{ downloader_tmp_dir }}/.extracted"
+    state: touch
+    mode: '0644'
+  delegate_to: localhost
+  become: false
+  when:
+    - result_url is not search('(?<!tar)\.bz2$')
+    - not extraction_marker.stat.exists
+
+- name: Extract plain bz2 file on localhost
   ansible.builtin.command:
-    cmd: bunzip2 "{{ downloader_tmp_dir ~ '/' ~ result_url | basename }}"
-    creates: "{{ downloader_tmp_dir ~ '/' ~ result_url | basename | regex_replace('\\.bz2$', '') }}"
-  when: result_url is search('(?<!tar)\.bz2$')
+    cmd: bunzip2 -k "{{ download_result.dest }}"
+    creates: "{{ download_result.dest | regex_replace('\\.bz2$', '') }}"
+  when:
+    - result_url is search('(?<!tar)\.bz2$')
+    - not extraction_marker.stat.exists
+  delegate_to: localhost
+  become: false
+  throttle: 1
 
-- name: Find executable files in extracted directory
+- name: Create extraction marker for bz2
+  ansible.builtin.file:
+    path: "{{ downloader_tmp_dir }}/.extracted"
+    state: touch
+    mode: '0644'
+  delegate_to: localhost
+  become: false
+  when:
+    - result_url is search('(?<!tar)\.bz2$')
+    - not extraction_marker.stat.exists
+
+- name: Find executable files in extracted directory on localhost
   ansible.builtin.find:
     paths: "{{ downloader_tmp_dir }}"
     recurse: true
     file_type: file
   register: found_files
+  delegate_to: localhost
+  become: false
 
 - name: Filter only executable files
   ansible.builtin.set_fact:
     executable_files: >-
       {{ found_files.files | selectattr('mode', 'search', '.*[157]$') | map(attribute='path') | list }}
   when: result_url is not search('(?<!tar)\.bz2$')
-  
+
 - name: Filter the previously bzipped file
   ansible.builtin.set_fact:
     executable_files: ["{{ downloader_tmp_dir ~ '/' ~ result_url | basename | regex_replace('\\.bz2$', '') }}"]
@@ -39,13 +90,12 @@
   ansible.builtin.debug:
     msg: "{{ executable_files }}"
 
-- name: Copy file to {{ downloader_install_dir }}
+- name: Copy file from localhost to {{ downloader_install_dir }}
   ansible.builtin.copy:
     src: "{{ item }}"
     dest: "{{ downloader_install_dir }}/{{ downloader_binary_name | default(downloader_project) }}"
     owner: "{{ downloader_binary_owner }}"
     group: "{{ downloader_binary_group }}"
-    remote_src: true
     mode: '0755'
   loop:
     "{{ executable_files }}"
