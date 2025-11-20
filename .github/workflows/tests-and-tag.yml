@@ -156,7 +156,7 @@ jobs:
         run: |
           pipx install ansible-core==${{ env.ANSIBLE_CORE_VERSION }}
           pipx inject --include-apps ansible-core molecule
-          pipx inject --include-apps ansible-core "molecule-plugins[podman]"
+          pipx inject ansible-core "molecule-plugins[podman]"
 
           # Add pipx bin directory to PATH for subsequent steps
           echo "/usr/local/bin" >> $GITHUB_PATH
