@@ -35,7 +35,10 @@ jobs:
         run: apt update && apt -y install pipx
 
       - name: Install ansible-core
-        run: pipx install ansible-core==${{ env.ANSIBLE_CORE_VERSION }}
+        run: |
+          pipx install ansible-core==${{ env.ANSIBLE_CORE_VERSION }}
+          # Add pipx bin directory to PATH for subsequent steps
+          echo "/root/.local/bin" >> $GITHUB_PATH
         env:
           PIPX_HOME: /root/.local/pipx
 
@@ -152,8 +155,8 @@ jobs:
       - name: Install Ansible and Molecule
         run: |
           pipx install ansible-core==${{ env.ANSIBLE_CORE_VERSION }}
-          pipx inject ansible-core molecule
-          pipx inject ansible-core "molecule-plugins[podman]"
+          pipx inject --include-apps ansible-core molecule
+          pipx inject --include-apps ansible-core "molecule-plugins[podman]"
 
           # Add pipx bin directory to PATH for subsequent steps
           echo "/usr/local/bin" >> $GITHUB_PATH
