@@ -120,6 +120,7 @@ jobs:
 
           # Set environment for rootless podman
           echo "DOCKER_HOST=unix:///run/user/$(id -u)/podman/podman.sock" >> $GITHUB_ENV
+          echo "XDG_RUNTIME_DIR=/run/user/$(id -u)" >> $GITHUB_ENV
 
       - name: Verify container engine
         run: |
