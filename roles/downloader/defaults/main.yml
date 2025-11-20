@@ -5,6 +5,7 @@ downloader_matchers_linux_x86_64:
   - x86_64-linux
   - linux-amd64
   - linux_amd64
+  - linux_x86_64
 
 downloader_matchers_linux_aarch64:
   - aarch64-unknown-linux-musl
