@@ -110,8 +110,8 @@ jobs:
       - name: Install Podman (GitHub Actions)
         if: steps.container-engine.outputs.engine == 'podman' && !contains(github.server_url, 'gitea')
         run: |
-          sudo apt-get update
-          sudo apt-get -y install podman
+          apt-get update
+          apt-get -y install podman
           podman version
 
           # Start podman socket for molecule
@@ -129,8 +129,8 @@ jobs:
 
       - name: Install Python and pipx
         run: |
-          sudo apt-get update
-          sudo apt-get -y install python3 python3-pip pipx
+          apt-get update
+          apt-get -y install python3 python3-pip pipx
           pipx ensurepath
 
       - name: Install Ansible and Molecule
