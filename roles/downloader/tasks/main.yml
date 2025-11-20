@@ -7,74 +7,74 @@
 
 - name: Download, extract, move and cleanup
   block:
-  - name: Create base download directory on localhost (once)
-    ansible.builtin.tempfile:
-      state: directory
-      prefix: downloader.
-    register: _base_tmp_dir
-    delegate_to: localhost
-    become: false
-    run_once: true
+    - name: Create base download directory on localhost (once)
+      ansible.builtin.tempfile:
+        state: directory
+        prefix: downloader.
+      register: _base_tmp_dir
+      delegate_to: localhost
+      become: false
+      run_once: true
 
-  - name: Create architecture-specific subdirectory on localhost
-    ansible.builtin.file:
-      path: "{{ _base_tmp_dir.path }}/{{ ansible_system | lower }}_{{ ansible_architecture }}"
-      state: directory
-      mode: '0755'
-    delegate_to: localhost
-    become: false
+    - name: Create architecture-specific subdirectory on localhost
+      ansible.builtin.file:
+        path: "{{ _base_tmp_dir.path }}/{{ ansible_system | lower }}_{{ ansible_architecture }}"
+        state: directory
+        mode: '0755'
+      delegate_to: localhost
+      become: false
 
-  - name: Set temporary directory path fact
-    ansible.builtin.set_fact:
-      downloader_tmp_dir: "{{ _base_tmp_dir.path }}/{{ ansible_system | lower }}_{{ ansible_architecture }}"
-      downloader_base_tmp_dir: "{{ _base_tmp_dir.path }}"
+    - name: Set temporary directory path fact
+      ansible.builtin.set_fact:
+        downloader_tmp_dir: "{{ _base_tmp_dir.path }}/{{ ansible_system | lower }}_{{ ansible_architecture }}"
+        downloader_base_tmp_dir: "{{ _base_tmp_dir.path }}"
 
-  - name: Check if binary already downloaded on localhost
-    ansible.builtin.stat:
-      path: "{{ downloader_tmp_dir }}/{{ result_url | basename }}"
-    register: binary_exists
-    delegate_to: localhost
-    become: false
+    - name: Check if binary already downloaded on localhost
+      ansible.builtin.stat:
+        path: "{{ downloader_tmp_dir }}/{{ result_url | basename }}"
+      register: binary_exists
+      delegate_to: localhost
+      become: false
 
-  - name: Prepare checksum for verification
-    ansible.builtin.include_tasks: tasks/prepare_checksum.yml
-    when: not binary_exists.stat.exists
+    - name: Prepare checksum for verification
+      ansible.builtin.include_tasks: tasks/prepare_checksum.yml
+      when: not binary_exists.stat.exists
 
-  - name: Download the file to localhost (skips if exists)
-    ansible.builtin.get_url:
-      url: "{{ result_url }}"
-      dest: "{{ downloader_tmp_dir }}/{{ result_url | basename }}"
-      mode: '0640'
-      checksum: "{{ binary_checksum | default(omit) }}"
-    register: download_result_raw
-    delegate_to: localhost
-    become: false
-    when: not binary_exists.stat.exists
-    throttle: 1
-
-  - name: Set download result path
-    ansible.builtin.set_fact:
-      download_result:
+    - name: Download the file to localhost (skips if exists)
+      ansible.builtin.get_url:
+        url: "{{ result_url }}"
         dest: "{{ downloader_tmp_dir }}/{{ result_url | basename }}"
+        mode: '0640'
+        checksum: "{{ binary_checksum | default(omit) }}"
+      register: download_result_raw
+      delegate_to: localhost
+      become: false
+      when: not binary_exists.stat.exists
+      throttle: 1
 
-  - name: Debug download result
-    ansible.builtin.debug:
-      msg: "Downloaded to: {{ download_result.dest }}"
-    when: downloader_debug | default(false)
+    - name: Set download result path
+      ansible.builtin.set_fact:
+        download_result:
+          dest: "{{ downloader_tmp_dir }}/{{ result_url | basename }}"
 
-  - name: Handle archive
-    ansible.builtin.include_tasks: tasks/handle_archive.yml
-    when: result_url is match(downloader_archive_regex)
+    - name: Debug download result
+      ansible.builtin.debug:
+        msg: "Downloaded to: {{ download_result.dest }}"
+      when: downloader_debug | default(false)
 
-  - name: Handle single binary
-    ansible.builtin.include_tasks: tasks/handle_binary.yml
-    when: result_url is not match(downloader_archive_regex)
+    - name: Handle archive
+      ansible.builtin.include_tasks: tasks/handle_archive.yml
+      when: result_url is match(downloader_archive_regex)
+
+    - name: Handle single binary
+      ansible.builtin.include_tasks: tasks/handle_binary.yml
+      when: result_url is not match(downloader_archive_regex)
 
   always:
-  - name: Delete base download directory on localhost (once)
-    ansible.builtin.file:
-      path: "{{ downloader_base_tmp_dir }}"
-      state: absent
-    delegate_to: localhost
-    become: false
-    run_once: true
+    - name: Delete base download directory on localhost (once)
+      ansible.builtin.file:
+        path: "{{ downloader_base_tmp_dir }}"
+        state: absent
+      delegate_to: localhost
+      become: false
+      run_once: true

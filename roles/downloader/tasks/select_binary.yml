@@ -36,7 +36,7 @@
   become: false
   delegate_to: localhost
   when: downloader_version is undefined
-    #no_log: true
+  # no_log: true
 
 - name: Download the release data from the API for version {{ downloader_version }}
   ansible.builtin.uri:
@@ -54,7 +54,12 @@
 
 - name: Show available assets from GitHub
   ansible.builtin.debug:
-    msg: "Available assets: {{ (github_api_data_latest.json.assets | default(github_api_data_versioned.json.assets | default([]))) | map(attribute='name') | list }}"
+    msg: >-
+      Available assets: {{
+        (github_api_data_latest.json.assets |
+         default(github_api_data_versioned.json.assets | default([]))) |
+        map(attribute='name') | list
+      }}
   when: downloader_debug | default(false)
 
 - name: Select binary URLs for latest version
