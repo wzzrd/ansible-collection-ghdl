@@ -112,18 +112,32 @@ jobs:
         run: |
           apt-get update
           apt-get -y install podman
-          
+
           # Configure XDG RUNTIME DIR
-          echo "XDG_RUNTIME_DIR=/run/user/$(id -u)" >> $GITHUB_ENV
+          export XDG_RUNTIME_DIR=/run/user/$(id -u)
+          echo "XDG_RUNTIME_DIR=$XDG_RUNTIME_DIR" >> $GITHUB_ENV
+
+          # Create XDG_RUNTIME_DIR if it doesn't exist
+          mkdir -p "$XDG_RUNTIME_DIR"
+          chmod 700 "$XDG_RUNTIME_DIR"
 
           podman version
 
-          # Start podman socket for molecule
-          systemctl --user enable --now podman.socket
-          systemctl --user status podman.socket || true
+          # Start podman socket for molecule (with proper D-Bus session handling)
+          export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"
+
+          # Try to start with systemd, fallback to manual start if no user session
+          if systemctl --user is-system-running &>/dev/null; then
+            systemctl --user enable --now podman.socket
+            systemctl --user status podman.socket || true
+          else
+            echo "No systemd user session available, starting podman socket manually"
+            podman system service --time=0 unix://$XDG_RUNTIME_DIR/podman/podman.sock &
+            sleep 2
+          fi
 
           # Set environment for rootless podman
-          echo "DOCKER_HOST=unix:///run/user/$(id -u)/podman/podman.sock" >> $GITHUB_ENV
+          echo "DOCKER_HOST=unix://$XDG_RUNTIME_DIR/podman/podman.sock" >> $GITHUB_ENV
 
       - name: Verify container engine
         run: |
