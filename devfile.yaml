@@ -1,0 +1,93 @@
+schemaVersion: 2.2.0
+attributes:
+  controller.devfile.io/storage-type: per-workspace
+metadata:
+  name: ansible-collection-ghdl
+  displayName: Ansible Collection GHDL Development
+  description: Secure development environment for GHDL Ansible collection with nested Podman support.
+
+components:
+  - name: dev-tools
+    attributes:
+      pod-overrides:
+        metadata:
+          annotations:
+            # Removed /dev/net/tun as it is a significant security risk unless specifically required for VPNs.
+            # Kept /dev/fuse as it is required for rootless Podman to mount filesystems.
+            io.kubernetes.cri-o.Devices: "/dev/fuse"
+        spec:
+          # Maintains User Namespace isolation. Maps container root to a non-privileged host user.
+          hostUsers: false
+      container-overrides:
+        securityContext:
+          # SECURITY FIX: Removed 'procMount: Unmasked'. 
+          # Modern OpenShift/Dev Spaces versions support rootless Podman via User Namespaces 
+          # without exposing the host's sensitive /proc filesystem.
+          runAsNonRoot: true
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+    container:
+      # RECOMMENDATION: Replace with a pinned SHA or a versioned tag (e.g., :1.0.0) 
+      # and mirror to a trusted registry to avoid supply chain attacks.
+      image: quay.io/jpullen0/ansible-devspaces-nested-podman:latest
+      cpuLimit: 4000m
+      cpuRequest: 500m
+      memoryLimit: 4Gi
+      memoryRequest: 512Mi
+      endpoints:
+        - name: antora-docs
+          targetPort: 8080
+          # SECURITY FIX: Changed to 'internal'. This prevents the documentation 
+          # server from being exposed to the public internet by default.
+          exposure: internal
+          protocol: https
+      env:
+        - name: VSCODE_DEFAULT_WORKSPACE
+          value: /projects/ansible-collection-ghdl
+        - name: ANSIBLE_COLLECTIONS_PATH
+          value: /projects/ansible-collection-ghdl
+
+  - name: prep-workspace
+    container:
+      image: image-registry.openshift-image-registry.svc:5000/openshift/cli:latest
+      memoryLimit: 256Mi
+      cpuLimit: 200m
+      mountSources: true
+      sourceMapping: /projects
+      command: ['/bin/bash']
+      args:
+        - '-c'
+        - >-
+          mkdir -p /projects/bin && 
+          cp /usr/bin/oc /projects/bin/oc && 
+          cp /usr/bin/kubectl /projects/bin/kubectl && 
+          if [[ -f ${HOME}/.kube/config ]]; then rm ${HOME}/.kube/config; fi
+      env:
+        - name: HOME
+          value: "/projects/home"
+
+commands:
+  - id: prep-workspace
+    apply:
+      component: prep-workspace
+      label: "Initialize Workspace Binaries"
+
+  - id: start-antora
+    exec:
+      component: dev-tools
+      commandLine: "podman run --rm --name antora -v /projects/ansible-collection-ghdl:/antora:z -p 8080:8080 -d ghcr.io/juliaaano/antora-viewer"
+      workingDir: "/projects/ansible-collection-ghdl"
+      label: "Start Antora Documentation Server"
+
+  - id: stop-antora
+    exec:
+      component: dev-tools
+      commandLine: "podman stop antora"
+      workingDir: "/projects/ansible-collection-ghdl"
+      label: "Stop Antora Documentation Server"
+
+events:
+  preStart:
+    - prep-workspace
