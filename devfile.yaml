@@ -5,6 +5,11 @@ metadata:
   name: ansible-collection-ghdl
 components:
   - name: tooling-container
+    attributes:
+      pod-overrides:
+        metadata:
+          annotations:
+            io.kubernetes.cri-o.Devices: "/dev/net/tun"
     container:
       image: ghcr.io/ansible/ansible-devspaces:latest
       memoryRequest: 256M
