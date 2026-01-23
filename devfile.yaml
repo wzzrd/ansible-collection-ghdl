@@ -10,6 +10,9 @@ components:
         metadata:
           annotations:
             io.kubernetes.cri-o.Devices: "/dev/net/tun"
+      container-overrides:
+        securityContext:
+          procMount: Unmasked
     container:
       image: ghcr.io/ansible/ansible-devspaces:latest
       memoryRequest: 256M
