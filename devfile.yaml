@@ -16,7 +16,7 @@ components:
         securityContext:
           procMount: Unmasked
     container:
-      image: ghcr.io/ansible/ansible-devspaces:latest
+      image: quay.io/jpullen0/ansible-devspaces-nested-podman:latest
       memoryRequest: 256M
       memoryLimit: 6Gi
       cpuRequest: 250m
