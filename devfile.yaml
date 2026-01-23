@@ -7,7 +7,7 @@ components:
   - name: tooling-container
     container:
       image: ghcr.io/ansible/ansible-devspaces:v26.1.0
-      memoryRequest: 256M
+      memoryRequest: 128M
       memoryLimit: 6Gi
       cpuRequest: 250m
       cpuLimit: 2000m
