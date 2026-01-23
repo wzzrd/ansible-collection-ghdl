@@ -9,7 +9,7 @@ components:
       pod-overrides:
         metadata:
           annotations:
-            io.kubernetes.cri-o.Devices: "/dev/net/tun"
+            io.kubernetes.cri-o.Devices: "/dev/fuse,/dev/net/tun"
         spec:
           hostUsers: false
       container-overrides:
