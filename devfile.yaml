@@ -1,7 +1,8 @@
-# cspell: disable=devspaces
 schemaVersion: 2.2.2
+attribute:
+  controller.devfile.io/storage-type: per-workspace
 metadata:
-  name: ansible-demo
+  name: ansible-collection-ghdl
 components:
   - name: tooling-container
     container:
@@ -10,24 +11,15 @@ components:
       memoryLimit: 6Gi
       cpuRequest: 250m
       cpuLimit: 2000m
-      args: ['tail', '-f', '/dev/null']
-      env:
-        - name: 'ANSIBLE_COLLECTIONS_PATH'
-          value: '~/.ansible/collections:/usr/share/ansible/collections:/projects/ansible-devspaces-demo/collections'
-        - name: 'KUBEDOCK_ENABLED'
-          value: "false"
     attributes:
       pod-overrides:
         metadata:
           annotations:
-            # Ask for /dev/fuse and /dev/net/tun to be mapped into this Pod
             io.kubernetes.cri-o.Devices: "/dev/fuse,/dev/net/tun"
         spec:
-          # Instruct the container runtime to create a new user namespace for the containers in this Pod.
           hostUsers: false
       container-overrides:
         securityContext:
-          # Ask for an unmasked /proc to be available to this container
           procMount: Unmasked
 commands:
 
