@@ -6,21 +6,16 @@ metadata:
 components:
   - name: tooling-container
     container:
-      image: ghcr.io/ansible/ansible-devspaces:v26.1.0
-      memoryRequest: 128M
+      image: ghcr.io/ansible/ansible-devspaces:latest
+      memoryRequest: 256M
       memoryLimit: 6Gi
       cpuRequest: 250m
       cpuLimit: 2000m
-    attributes:
-      pod-overrides:
-        metadata:
-          annotations:
-            io.kubernetes.cri-o.Devices: "/dev/fuse,/dev/net/tun"
-        spec:
-          hostUsers: false
-      container-overrides:
-        securityContext:
-          procMount: Unmasked
+      args: ["tail", "-f", "/dev/null"]
+      env:
+        - name: "ANSIBLE_COLLECTIONS_PATH"
+          value: "~/.ansible/collections:/usr/share/ansible/collections:/projects/ansible-devspaces-demo/collections"
+
 commands:
 
   - id: molecule-create
