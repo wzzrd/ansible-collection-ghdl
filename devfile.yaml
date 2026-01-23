@@ -1,5 +1,5 @@
 schemaVersion: 2.2.2
-attribute:
+attributes:
   controller.devfile.io/storage-type: per-workspace
 metadata:
   name: ansible-collection-ghdl
