@@ -12,9 +12,18 @@ components:
             io.kubernetes.cri-o.Devices: "/dev/fuse,/dev/net/tun"
         spec:
           hostUsers: false
+          volumes:  # ADD THIS SECTION
+            - name: cgroup
+              hostPath:
+                path: /sys/fs/cgroup
+                type: Directory
       container-overrides:
         securityContext:
           procMount: Unmasked
+        volumeMounts:  # ADD THIS SECTION
+          - name: cgroup
+            mountPath: /sys/fs/cgroup
+            readOnly: false
     container:
       image: quay.io/jpullen0/ansible-devspaces-nested-podman:latest
       memoryRequest: 256M
@@ -25,9 +34,7 @@ components:
       env:
         - name: "ANSIBLE_COLLECTIONS_PATH"
           value: "~/.ansible/collections:/usr/share/ansible/collections:/projects/ansible-devspaces-demo/collections"
-
 commands:
-
   - id: molecule-create
     exec:
       label: "1.Molecule: start a test pod for the automation"
@@ -37,7 +44,6 @@ commands:
         kind: run
         isDefault: true
       component: tooling-container
-
   - id: molecule-list
     exec:
       label: "2.Molecule: view the test instance that was created"
@@ -47,7 +53,6 @@ commands:
         kind: run
         isDefault: true
       component: tooling-container
-
   - id: molecule-converge
     exec:
       label: "3.Molecule: apply the role to the pod"
@@ -57,7 +62,6 @@ commands:
         kind: run
         isDefault: true
       component: tooling-container
-
   - id: molecule-verify
     exec:
       label: "4.Molecule: run the verification against the test pod"
@@ -67,7 +71,6 @@ commands:
         kind: run
         isDefault: true
       component: tooling-container
-
   - id: molecule-destroy
     exec:
       label: "5.Molecule: reset the test pod back to a fresh instance"
@@ -77,7 +80,6 @@ commands:
         kind: run
         isDefault: true
       component: tooling-container
-
   - id: molecule-test
     exec:
       label: "6.Molecule: run the full molecule test"
@@ -87,7 +89,6 @@ commands:
         kind: run
         isDefault: true
       component: tooling-container
-
   - id: ansible-navigator
     exec:
       label: "Ansible-Navigator: Start ansible-navigator"
