@@ -1,4 +1,6 @@
-schemaVersion: 2.2.2
+This creates an isolated cgroup hierarchy for the container, which is actually what you want for running nested containers with systemd.
+Update your devfile:
+yamlschemaVersion: 2.2.2
 attributes:
   controller.devfile.io/storage-type: per-workspace
 metadata:
@@ -12,18 +14,16 @@ components:
             io.kubernetes.cri-o.Devices: "/dev/fuse,/dev/net/tun"
         spec:
           hostUsers: false
-          volumes:  # ADD THIS SECTION
+          volumes:
             - name: cgroup
-              hostPath:
-                path: /sys/fs/cgroup
-                type: Directory
+              emptyDir:
+                medium: Memory  # Use tmpfs
       container-overrides:
         securityContext:
           procMount: Unmasked
-        volumeMounts:  # ADD THIS SECTION
+        volumeMounts:
           - name: cgroup
             mountPath: /sys/fs/cgroup
-            readOnly: false
     container:
       image: quay.io/jpullen0/ansible-devspaces-nested-podman:latest
       memoryRequest: 256M
