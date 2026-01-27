@@ -15,6 +15,14 @@ components:
         spec:
           hostUsers: false
           volumes:
+            - name: dev-fuse
+              hostPath:
+                path: /dev/fuse
+                type: CharDevice
+            - name: dev-tun
+              hostPath:
+                path: /dev/net/tun
+                type: CharDevice
             - name: cgroup
               emptyDir:
                 medium: Memory  # Use tmpfs
