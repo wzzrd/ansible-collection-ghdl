@@ -32,6 +32,10 @@ components:
         volumeMounts:
           - name: cgroup
             mountPath: /sys/fs/cgroup
+          - name: dev-fuse
+            mountPath: /dev/fuse
+          - name: dev-tun
+            mountPath: /dev/net/tun
     container:
       image: quay.io/jpullen0/ansible-devspaces-nested-podman:latest
       memoryRequest: 256M
