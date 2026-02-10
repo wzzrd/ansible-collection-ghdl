@@ -1,93 +1,104 @@
-schemaVersion: 2.2.0
+schemaVersion: 2.2.2
 attributes:
   controller.devfile.io/storage-type: per-workspace
 metadata:
   name: ansible-collection-ghdl
-  displayName: Ansible Collection GHDL Development
-  description: Secure development environment for GHDL Ansible collection with nested Podman support.
-
 components:
-  - name: dev-tools
+  - name: tooling-container
     attributes:
       pod-overrides:
         metadata:
           annotations:
-            # Removed /dev/net/tun as it is a significant security risk unless specifically required for VPNs.
-            # Kept /dev/fuse as it is required for rootless Podman to mount filesystems.
-            io.kubernetes.cri-o.Devices: "/dev/fuse"
+            io.kubernetes.cri-o.Devices: "/dev/net/tun,/dev/fuse"
         spec:
-          # Maintains User Namespace isolation. Maps container root to a non-privileged host user.
           hostUsers: false
       container-overrides:
         securityContext:
-          # SECURITY FIX: Removed 'procMount: Unmasked'. 
-          # Modern OpenShift/Dev Spaces versions support rootless Podman via User Namespaces 
-          # without exposing the host's sensitive /proc filesystem.
-          runAsNonRoot: true
-          allowPrivilegeEscalation: false
-          capabilities:
-            drop:
-              - ALL
+          procMount: Unmasked
     container:
-      # RECOMMENDATION: Replace with a pinned SHA or a versioned tag (e.g., :1.0.0) 
-      # and mirror to a trusted registry to avoid supply chain attacks.
       image: quay.io/jpullen0/ansible-devspaces-nested-podman:latest
-      cpuLimit: 4000m
-      cpuRequest: 500m
-      memoryLimit: 4Gi
-      memoryRequest: 512Mi
-      endpoints:
-        - name: antora-docs
-          targetPort: 8080
-          # SECURITY FIX: Changed to 'internal'. This prevents the documentation 
-          # server from being exposed to the public internet by default.
-          exposure: internal
-          protocol: https
+      memoryRequest: 256M
+      memoryLimit: 6Gi
+      cpuRequest: 250m
+      cpuLimit: 2000m
+      args: ["tail", "-f", "/dev/null"]
       env:
-        - name: VSCODE_DEFAULT_WORKSPACE
-          value: /projects/ansible-collection-ghdl
-        - name: ANSIBLE_COLLECTIONS_PATH
-          value: /projects/ansible-collection-ghdl
-
-  - name: prep-workspace
-    container:
-      image: image-registry.openshift-image-registry.svc:5000/openshift/cli:latest
-      memoryLimit: 256Mi
-      cpuLimit: 200m
-      mountSources: true
-      sourceMapping: /projects
-      command: ['/bin/bash']
-      args:
-        - '-c'
-        - >-
-          mkdir -p /projects/bin && 
-          cp /usr/bin/oc /projects/bin/oc && 
-          cp /usr/bin/kubectl /projects/bin/kubectl && 
-          if [[ -f ${HOME}/.kube/config ]]; then rm ${HOME}/.kube/config; fi
-      env:
-        - name: HOME
-          value: "/projects/home"
+        - name: "ANSIBLE_COLLECTIONS_PATH"
+          value: "~/.ansible/collections:/usr/share/ansible/collections:/projects/ansible-devspaces-demo/collections"
 
 commands:
-  - id: prep-workspace
-    apply:
-      component: prep-workspace
-      label: "Initialize Workspace Binaries"
 
-  - id: start-antora
+  - id: molecule-create
     exec:
-      component: dev-tools
-      commandLine: "podman run --rm --name antora -v /projects/ansible-collection-ghdl:/antora:z -p 8080:8080 -d ghcr.io/juliaaano/antora-viewer"
-      workingDir: "/projects/ansible-collection-ghdl"
-      label: "Start Antora Documentation Server"
+      label: "1.Molecule: start a test pod for the automation"
+      commandLine: 'source $HOME/.bashrc && molecule create'
+      workingDir: ${PROJECTS_ROOT}/ansible-devspaces-demo/collections/ansible_collections/sample_namespace/sample_collection/extensions
+      group:
+        kind: run
+        isDefault: true
+      component: tooling-container
 
-  - id: stop-antora
+  - id: molecule-list
     exec:
-      component: dev-tools
-      commandLine: "podman stop antora"
-      workingDir: "/projects/ansible-collection-ghdl"
-      label: "Stop Antora Documentation Server"
+      label: "2.Molecule: view the test instance that was created"
+      commandLine: 'source $HOME/.bashrc && molecule list'
+      workingDir: ${PROJECTS_ROOT}/ansible-devspaces-demo/collections/ansible_collections/sample_namespace/sample_collection/extensions
+      group:
+        kind: run
+        isDefault: true
+      component: tooling-container
 
+  - id: molecule-converge
+    exec:
+      label: "3.Molecule: apply the role to the pod"
+      commandLine: 'source $HOME/.bashrc && molecule converge'
+      workingDir: ${PROJECTS_ROOT}/ansible-devspaces-demo/collections/ansible_collections/sample_namespace/sample_collection/extensions
+      group:
+        kind: run
+        isDefault: true
+      component: tooling-container
+
+  - id: molecule-verify
+    exec:
+      label: "4.Molecule: run the verification against the test pod"
+      commandLine: 'source $HOME/.bashrc && molecule verify'
+      workingDir: ${PROJECTS_ROOT}/ansible-devspaces-demo/collections/ansible_collections/sample_namespace/sample_collection/extensions
+      group:
+        kind: run
+        isDefault: true
+      component: tooling-container
+
+  - id: molecule-destroy
+    exec:
+      label: "5.Molecule: reset the test pod back to a fresh instance"
+      commandLine: 'source $HOME/.bashrc && molecule destroy'
+      workingDir: ${PROJECTS_ROOT}/ansible-devspaces-demo/collections/ansible_collections/sample_namespace/sample_collection/extensions
+      group:
+        kind: run
+        isDefault: true
+      component: tooling-container
+
+  - id: molecule-test
+    exec:
+      label: "6.Molecule: run the full molecule test"
+      commandLine: 'source $HOME/.bashrc && molecule test'
+      workingDir: ${PROJECTS_ROOT}/ansible-devspaces-demo/collections/ansible_collections/sample_namespace/sample_collection/extensions
+      group:
+        kind: run
+        isDefault: true
+      component: tooling-container
+
+  - id: ansible-navigator
+    exec:
+      label: "Ansible-Navigator: Start ansible-navigator"
+      commandLine: |
+        if [ ! -d "$HOME/.cache/ansible-navigator" ]; then
+          mkdir -p "$HOME/.cache/ansible-navigator"
+        fi
+        cp /usr/local/lib/python3.11/site-packages/ansible_navigator/data/catalog_collections.py $HOME/.cache/ansible-navigator
+        ansible-navigator --ee false
+      workingDir: ${PROJECTS_ROOT}/ansible-devspaces-demo
+      component: tooling-container
 events:
-  preStart:
-    - prep-workspace
+  preStop:
+    - "molecule-destroy"
