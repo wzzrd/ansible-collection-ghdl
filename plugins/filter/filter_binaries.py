@@ -70,7 +70,7 @@ def filter_binaries(api_dict, matchers):
 
     filtered_urls = [e for e in all_urls if any(match in e for match in matchers)]
 
-    drop_matchers = ["sha256", "-update", "apk", "rpm", "deb", "zst", "exe"]
+    drop_matchers = ["sha256", "-update", "apk", "android", "rpm", "deb", "zst", "exe"]
     binary_urls = [
         e for e in filtered_urls if not any(match in e for match in drop_matchers)
     ]
@@ -83,7 +83,18 @@ def filter_binaries(api_dict, matchers):
             f"After removing package formats: {binary_urls}"
         )
 
-    return binary_urls[0]
+    # Prioritize main binaries over variants (server, daemon, cli, agent, etc.)
+    # Extract filenames for sorting
+    deprioritize_patterns = ["-server*", "-android*", "-daemon*", "-agent*", "-cli*"]
+
+    def sort_priority(url):
+        """Return 0 for main binaries, 1 for variant binaries (lower = higher priority)"""
+        filename = url.split('/')[-1]
+        return 1 if any(pattern in filename for pattern in deprioritize_patterns) else 0
+
+    binary_urls_sorted = sorted(binary_urls, key=sort_priority)
+
+    return binary_urls_sorted[0]
 
 
 class FilterModule(object):
