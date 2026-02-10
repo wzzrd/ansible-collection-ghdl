@@ -1,0 +1,112 @@
+---
+argument_specs:
+  main:
+    short_description: Download and install binary releases from GitHub
+    description:
+      - Downloads the latest (or specified) binary release from a GitHub repository.
+      - Handles cross-platform binary selection, archive extraction, and installation.
+      - Supports checksum verification when available in the release.
+    author:
+      - Maxim Burgerhout
+    options:
+      downloader_organization:
+        description:
+          - The GitHub organization or user that owns the repository.
+        type: str
+        required: true
+
+      downloader_project:
+        description:
+          - The GitHub repository name.
+        type: str
+        required: true
+
+      downloader_github_token:
+        description:
+          - GitHub Personal Access Token for API authentication.
+          - Required to avoid API rate limiting (60 req/hour unauthenticated vs 5000/hour authenticated).
+        type: str
+        required: true
+        no_log: true
+
+      downloader_version:
+        description:
+          - Specific version tag to download.
+          - If not specified, the latest release is downloaded.
+        type: str
+        required: false
+
+      downloader_install_dir:
+        description:
+          - Directory where the binary will be installed.
+        type: path
+        required: false
+        default: /usr/local/bin
+
+      downloader_binary_name:
+        description:
+          - Override the installed binary filename.
+          - Use when the binary name differs from the project name (e.g., ripgrep -> rg).
+          - If not specified, the project name is used.
+        type: str
+        required: false
+
+      downloader_binary_owner:
+        description:
+          - Owner of the installed binary file.
+        type: str
+        required: false
+        default: root
+
+      downloader_binary_group:
+        description:
+          - Group of the installed binary file.
+        type: str
+        required: false
+        default: root
+
+      downloader_debug:
+        description:
+          - Enable verbose debug output showing asset names, URLs, and filter results.
+        type: bool
+        required: false
+        default: false
+
+      downloader_matchers_linux_x86_64:
+        description:
+          - List of patterns to match x86_64 Linux binaries in release assets.
+          - Override to customize binary selection for this architecture.
+        type: list
+        elements: str
+        required: false
+        default:
+          - x86_64-unknown-linux-musl
+          - x86_64-unknown-linux-gnu
+          - linux_amd64
+          - x86_64-linux
+          - linux-amd64
+          - linux_x86_64
+
+      downloader_matchers_linux_aarch64:
+        description:
+          - List of patterns to match aarch64 Linux binaries in release assets.
+          - Override to customize binary selection for this architecture.
+        type: list
+        elements: str
+        required: false
+        default:
+          - aarch64-unknown-linux-musl
+          - aarch64-unknown-linux-gnu
+          - linux_arm64
+          - aarch64-linux
+          - linux-arm64
+          - linux_arm64
+
+      downloader_matchers_darwin_arm64:
+        description:
+          - List of patterns to match ARM64 macOS binaries in release assets.
+          - Currently empty; must be configured to support this architecture.
+        type: list
+        elements: str
+        required: false
+        default: []

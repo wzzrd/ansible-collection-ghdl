@@ -41,11 +41,6 @@ platforms:
 
 driver:
   name: podman
-  options:
-    managed: false
-    login_cmd_template: "podman exec -it {instance} bash"
-    ansible_connection_options:
-      ansible_connection: podman
 
 provisioner:
   name: ansible
