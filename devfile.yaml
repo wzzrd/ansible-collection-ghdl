@@ -9,12 +9,20 @@ components:
       pod-overrides:
         metadata:
           annotations:
-            io.kubernetes.cri-o.Devices: "/dev/net/tun,/dev/fuse"
+            io.kubernetes.cri-o.Devices: "/dev/fuse,/dev/net/tun"
         spec:
           hostUsers: false
+          volumes:
+            - name: cgroup
+              emptyDir:
+                medium: Memory  # tmpfs for systemd
       container-overrides:
         securityContext:
+          privileged: true  # REQUIRED for device access
           procMount: Unmasked
+        volumeMounts:
+          - name: cgroup
+            mountPath: /sys/fs/cgroup
     container:
       image: quay.io/jpullen0/ansible-devspaces-nested-podman:latest
       memoryRequest: 256M
