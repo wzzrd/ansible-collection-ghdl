@@ -1,2 +1,8 @@
+.ansible
 plugins/filter/__pycache__
 *gz
+.devcontainer
+.envrc
+.vscode
+*.pyc
+.claude

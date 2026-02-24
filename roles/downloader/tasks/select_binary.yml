@@ -1,0 +1,101 @@
+---
+- name: Set matcher fact
+  ansible.builtin.set_fact:
+    downloader_matcher: downloader_matchers_{{ ansible_system | lower }}_{{ ansible_architecture }}
+
+- name: Validate architecture is supported
+  ansible.builtin.fail:
+    msg: |
+      Unsupported architecture: {{ ansible_system | lower }}_{{ ansible_architecture }}
+
+      Supported architectures:
+        - linux_x86_64
+        - linux_aarch64
+        - darwin_arm64 (matchers currently empty, see defaults/main.yml)
+
+      Current system: {{ ansible_system | lower }}_{{ ansible_architecture }}
+
+      To add support for your architecture, define the variable:
+        downloader_matchers_{{ ansible_system | lower }}_{{ ansible_architecture }}
+      with a list of binary name patterns to match.
+  when: downloader_matcher not in vars or vars[downloader_matcher] | length == 0
+
+- name: Set matcher list
+  ansible.builtin.set_fact:
+    downloader_matcher_list: "{{ vars[downloader_matcher] }}"
+
+- name: Download the release data from the API for the latest version
+  ansible.builtin.uri:
+    url:
+      "https://api.github.com/repos/{{ downloader_organization }}/\
+       {{ downloader_project }}/releases/latest"
+    headers:
+      Authorization: "Bearer {{ downloader_github_token }}"
+  register: downloader_api_latest
+  run_once: true
+  become: false
+  delegate_to: localhost
+  when: downloader_version is undefined
+  no_log: true
+
+- name: Download the release data from the API for version {{ downloader_version }}
+  ansible.builtin.uri:
+    url:
+      "https://api.github.com/repos/{{ downloader_organization }}/\
+      {{ downloader_project }}/releases/tags/{{ downloader_version }}"
+    headers:
+      Authorization: "Bearer {{ downloader_github_token }}"
+  register: downloader_api_versioned
+  run_once: true
+  become: false
+  delegate_to: localhost
+  when: downloader_version is defined
+  no_log: true
+
+- name: Show available assets from GitHub
+  ansible.builtin.debug:
+    msg: >-
+      Available assets: {{
+        (downloader_api_latest.json.assets |
+         default(downloader_api_versioned.json.assets | default([]))) |
+        map(attribute='name') | list
+      }}
+  when: downloader_debug | default(false)
+
+- name: Select binary URL for latest version
+  ansible.builtin.set_fact:
+    downloader_result_url: "{{ downloader_api_latest | wzzrd.ghdl.filter_binaries(downloader_matcher_list) }}"
+  when: downloader_api_latest.json.assets is defined
+
+- name: Select binary URL for named version
+  ansible.builtin.set_fact:
+    downloader_result_url: "{{ downloader_api_versioned | wzzrd.ghdl.filter_binaries(downloader_matcher_list) }}"
+  when: downloader_api_versioned.json.assets is defined
+
+- name: Show resulting download URL on GitHub
+  ansible.builtin.debug:
+    msg: "url: {{ downloader_result_url }}"
+  when: downloader_debug | default(false)
+
+- name: Get list of all asset names for checksum detection
+  ansible.builtin.set_fact:
+    downloader_release_assets: "{{ (downloader_api_latest.json.assets | default([])) + (downloader_api_versioned.json.assets | default([])) }}"
+
+- name: Set checksum URL to empty string
+  ansible.builtin.set_fact:
+    downloader_checksum_url: ""
+
+- name: Look for checksum file in assets (SHA256)
+  ansible.builtin.set_fact:
+    downloader_checksum_url: >-
+      {{ downloader_release_assets
+         | selectattr('name', 'match', '.*(SHA256SUMS|sha256sum|checksums\.txt|CHECKSUMS|checksum).*')
+         | map(attribute='browser_download_url')
+         | list
+         | first
+         | default('') }}
+
+- name: Show checksum file URL if found
+  ansible.builtin.debug:
+    msg: "Checksum file URL: {{ downloader_checksum_url if downloader_checksum_url else 'not found' }}"
+  when: downloader_debug | default(false)

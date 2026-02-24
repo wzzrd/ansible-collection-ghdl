@@ -1,0 +1,27 @@
+---
+- name: Set source file path from download result
+  ansible.builtin.set_fact:
+    downloader_src_path: "{{ downloader_dl_result.dest }}"
+    downloader_src_file: "{{ downloader_dl_result.dest | basename }}"
+
+- name: Debug source file info
+  ansible.builtin.debug:
+    msg: "Source file: {{ downloader_src_path }}, Filename: {{ downloader_src_file }}"
+  when: downloader_debug | default(false)
+
+- name: Determine dest filename
+  ansible.builtin.set_fact:
+    downloader_dest_file: "{{ downloader_binary_name | default((downloader_src_file | regex_replace('[._-].*', '')) or downloader_project) }}"
+
+- name: Debug resolved destination filename
+  ansible.builtin.debug:
+    msg: "Installing binary as: {{ downloader_install_dir }}/{{ downloader_dest_file }} (source: {{ downloader_src_file }})"
+  when: downloader_debug | default(false)
+
+- name: Copy file from localhost to {{ downloader_install_dir }}
+  ansible.builtin.copy:
+    src: "{{ downloader_src_path }}"
+    dest: "{{ downloader_install_dir ~ '/' ~ downloader_dest_file }}"
+    mode: '0755'
+    owner: "{{ downloader_binary_owner }}"
+    group: "{{ downloader_binary_group }}"
