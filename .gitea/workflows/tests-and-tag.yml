@@ -60,6 +60,16 @@ jobs:
       - name: Run pytest
         run: pytest tests/unit/ -v --tb=short --color=yes
 
+  black:
+    name: Python Formatting (black)
+    runs-on: ubi9-aarch64-ansible
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run black
+        run: black --check plugins/ tests/
+
   molecule:
     name: Integration Tests (Molecule)
     runs-on: ubi9-aarch64-ansible
@@ -85,6 +95,7 @@ jobs:
       - check-version
       - lint
       - pytest
+      - black
       - molecule
     if: needs.check-version.outputs.version_changed == 'true'
     steps:

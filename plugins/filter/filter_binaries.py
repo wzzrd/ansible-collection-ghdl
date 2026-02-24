@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-DOCUMENTATION = r'''
+DOCUMENTATION = r"""
 name: filter_binaries
 short_description: Filter GitHub API release assets to find binary downloads
 description:
@@ -23,9 +23,9 @@ options:
         type: list
         elements: str
         required: true
-'''
+"""
 
-EXAMPLES = r'''
+EXAMPLES = r"""
 # Filter GitHub release assets for Linux x86_64 binaries
 - name: Get binary URL for Linux x86_64
   set_fact:
@@ -35,14 +35,14 @@ EXAMPLES = r'''
 - name: Get binary URL for ARM64
   set_fact:
     binary_url: "{{ github_release_data | wzzrd.ghdl.filter_binaries(['arm64', 'aarch64']) }}"
-'''
+"""
 
-RETURN = r'''
+RETURN = r"""
 _value:
     description: First matching binary download URL
     type: str
     returned: success
-'''
+"""
 
 from ansible.errors import AnsibleFilterError
 
@@ -94,7 +94,7 @@ def filter_binaries(api_dict, matchers):
 
     def sort_priority(url):
         """Return 0 for main binaries, 1 for variant binaries (lower = higher priority)"""
-        filename = url.split('/')[-1]
+        filename = url.split("/")[-1]
         return 1 if any(pattern in filename for pattern in deprioritize_patterns) else 0
 
     binary_urls_sorted = sorted(binary_urls, key=sort_priority)

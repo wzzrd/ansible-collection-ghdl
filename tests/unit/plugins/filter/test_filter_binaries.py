@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 
 # Add the plugin directory to the path
-plugin_dir = Path(__file__).resolve().parents[4] / 'plugins' / 'filter'
+plugin_dir = Path(__file__).resolve().parents[4] / "plugins" / "filter"
 sys.path.insert(0, str(plugin_dir))
 
 from filter_binaries import filter_binaries
@@ -21,43 +21,64 @@ class TestFilterBinaries:
         api_dict = {
             "json": {
                 "assets": [
-                    {"browser_download_url": "https://github.com/org/proj/releases/download/v1.0.0/binary-linux-amd64"},
-                    {"browser_download_url": "https://github.com/org/proj/releases/download/v1.0.0/binary-darwin-arm64"},
+                    {
+                        "browser_download_url": "https://github.com/org/proj/releases/download/v1.0.0/binary-linux-amd64"
+                    },
+                    {
+                        "browser_download_url": "https://github.com/org/proj/releases/download/v1.0.0/binary-darwin-arm64"
+                    },
                 ]
             }
         }
         matchers = ["linux-amd64", "linux_amd64"]
         result = filter_binaries(api_dict, matchers)
-        assert result == "https://github.com/org/proj/releases/download/v1.0.0/binary-linux-amd64"
+        assert (
+            result
+            == "https://github.com/org/proj/releases/download/v1.0.0/binary-linux-amd64"
+        )
 
     def test_filters_out_rpm_packages(self):
         """Test that RPM packages are excluded from results."""
         api_dict = {
             "json": {
                 "assets": [
-                    {"browser_download_url": "https://github.com/org/proj/releases/download/v1.0.0/binary-1.0.0-x86_64.rpm"},
-                    {"browser_download_url": "https://github.com/org/proj/releases/download/v1.0.0/binary-linux-amd64"},
+                    {
+                        "browser_download_url": "https://github.com/org/proj/releases/download/v1.0.0/binary-1.0.0-x86_64.rpm"
+                    },
+                    {
+                        "browser_download_url": "https://github.com/org/proj/releases/download/v1.0.0/binary-linux-amd64"
+                    },
                 ]
             }
         }
         matchers = ["linux-amd64", "x86_64"]
         result = filter_binaries(api_dict, matchers)
         # Should skip the .rpm and return the binary
-        assert result == "https://github.com/org/proj/releases/download/v1.0.0/binary-linux-amd64"
+        assert (
+            result
+            == "https://github.com/org/proj/releases/download/v1.0.0/binary-linux-amd64"
+        )
 
     def test_filters_out_checksums(self):
         """Test that checksum files are excluded from results."""
         api_dict = {
             "json": {
                 "assets": [
-                    {"browser_download_url": "https://github.com/org/proj/releases/download/v1.0.0/binary-linux-amd64.sha256"},
-                    {"browser_download_url": "https://github.com/org/proj/releases/download/v1.0.0/binary-linux-amd64"},
+                    {
+                        "browser_download_url": "https://github.com/org/proj/releases/download/v1.0.0/binary-linux-amd64.sha256"
+                    },
+                    {
+                        "browser_download_url": "https://github.com/org/proj/releases/download/v1.0.0/binary-linux-amd64"
+                    },
                 ]
             }
         }
         matchers = ["linux-amd64"]
         result = filter_binaries(api_dict, matchers)
-        assert result == "https://github.com/org/proj/releases/download/v1.0.0/binary-linux-amd64"
+        assert (
+            result
+            == "https://github.com/org/proj/releases/download/v1.0.0/binary-linux-amd64"
+        )
 
     def test_filters_out_all_package_formats(self):
         """Test that package formats are excluded even when the architecture matcher also matches."""
@@ -66,25 +87,42 @@ class TestFilterBinaries:
                 "assets": [
                     # These all contain x86_64 so they match the architecture matcher,
                     # but should be dropped by the package format exclusion list.
-                    {"browser_download_url": "https://github.com/org/proj/releases/download/v1.0.0/binary-1.0.0-x86_64.rpm"},
-                    {"browser_download_url": "https://github.com/org/proj/releases/download/v1.0.0/binary-1.0.0-x86_64.deb"},
-                    {"browser_download_url": "https://github.com/org/proj/releases/download/v1.0.0/binary-1.0.0-x86_64.apk"},
-                    {"browser_download_url": "https://github.com/org/proj/releases/download/v1.0.0/binary-linux-x86_64.zst"},
-                    {"browser_download_url": "https://github.com/org/proj/releases/download/v1.0.0/binary-linux-amd64"},
+                    {
+                        "browser_download_url": "https://github.com/org/proj/releases/download/v1.0.0/binary-1.0.0-x86_64.rpm"
+                    },
+                    {
+                        "browser_download_url": "https://github.com/org/proj/releases/download/v1.0.0/binary-1.0.0-x86_64.deb"
+                    },
+                    {
+                        "browser_download_url": "https://github.com/org/proj/releases/download/v1.0.0/binary-1.0.0-x86_64.apk"
+                    },
+                    {
+                        "browser_download_url": "https://github.com/org/proj/releases/download/v1.0.0/binary-linux-x86_64.zst"
+                    },
+                    {
+                        "browser_download_url": "https://github.com/org/proj/releases/download/v1.0.0/binary-linux-amd64"
+                    },
                 ]
             }
         }
         matchers = ["linux-amd64", "x86_64"]
         result = filter_binaries(api_dict, matchers)
-        assert result == "https://github.com/org/proj/releases/download/v1.0.0/binary-linux-amd64"
+        assert (
+            result
+            == "https://github.com/org/proj/releases/download/v1.0.0/binary-linux-amd64"
+        )
 
     def test_no_matching_binary_raises_error(self):
         """Test that an error is raised when no binary matches."""
         api_dict = {
             "json": {
                 "assets": [
-                    {"browser_download_url": "https://github.com/org/proj/releases/download/v1.0.0/binary-windows.exe"},
-                    {"browser_download_url": "https://github.com/org/proj/releases/download/v1.0.0/binary-darwin-arm64"},
+                    {
+                        "browser_download_url": "https://github.com/org/proj/releases/download/v1.0.0/binary-windows.exe"
+                    },
+                    {
+                        "browser_download_url": "https://github.com/org/proj/releases/download/v1.0.0/binary-darwin-arm64"
+                    },
                 ]
             }
         }
@@ -100,11 +138,7 @@ class TestFilterBinaries:
 
     def test_empty_assets_raises_error(self):
         """Test that an error is raised when assets list is empty."""
-        api_dict = {
-            "json": {
-                "assets": []
-            }
-        }
+        api_dict = {"json": {"assets": []}}
         matchers = ["linux-amd64"]
 
         with pytest.raises(AnsibleFilterError) as exc_info:
@@ -128,7 +162,9 @@ class TestFilterBinaries:
         api_dict = {
             "json": {
                 "assets": [
-                    {"browser_download_url": "https://github.com/org/proj/releases/download/v1.0.0/binary-linux-amd64"},
+                    {
+                        "browser_download_url": "https://github.com/org/proj/releases/download/v1.0.0/binary-linux-amd64"
+                    },
                 ]
             }
         }
@@ -141,11 +177,7 @@ class TestFilterBinaries:
 
     def test_missing_assets_key_raises_error(self):
         """Test that an error is raised when assets key is missing."""
-        api_dict = {
-            "json": {
-                "foo": "bar"
-            }
-        }
+        api_dict = {"json": {"foo": "bar"}}
         matchers = ["linux-amd64"]
 
         with pytest.raises(AnsibleFilterError) as exc_info:
@@ -158,104 +190,169 @@ class TestFilterBinaries:
         api_dict = {
             "json": {
                 "assets": [
-                    {"browser_download_url": "https://github.com/org/proj/releases/download/v1.0.0/binary-x86_64-unknown-linux-musl"},
-                    {"browser_download_url": "https://github.com/org/proj/releases/download/v1.0.0/binary-darwin-arm64"},
+                    {
+                        "browser_download_url": "https://github.com/org/proj/releases/download/v1.0.0/binary-x86_64-unknown-linux-musl"
+                    },
+                    {
+                        "browser_download_url": "https://github.com/org/proj/releases/download/v1.0.0/binary-darwin-arm64"
+                    },
                 ]
             }
         }
-        matchers = ["x86_64-unknown-linux-musl", "x86_64-unknown-linux-gnu", "linux_amd64"]
+        matchers = [
+            "x86_64-unknown-linux-musl",
+            "x86_64-unknown-linux-gnu",
+            "linux_amd64",
+        ]
         result = filter_binaries(api_dict, matchers)
-        assert result == "https://github.com/org/proj/releases/download/v1.0.0/binary-x86_64-unknown-linux-musl"
+        assert (
+            result
+            == "https://github.com/org/proj/releases/download/v1.0.0/binary-x86_64-unknown-linux-musl"
+        )
 
     def test_returns_first_match(self):
         """Test that the first matching binary is returned when multiple match."""
         api_dict = {
             "json": {
                 "assets": [
-                    {"browser_download_url": "https://github.com/org/proj/releases/download/v1.0.0/binary-linux-amd64"},
-                    {"browser_download_url": "https://github.com/org/proj/releases/download/v1.0.0/another-linux-amd64"},
+                    {
+                        "browser_download_url": "https://github.com/org/proj/releases/download/v1.0.0/binary-linux-amd64"
+                    },
+                    {
+                        "browser_download_url": "https://github.com/org/proj/releases/download/v1.0.0/another-linux-amd64"
+                    },
                 ]
             }
         }
         matchers = ["linux-amd64"]
         result = filter_binaries(api_dict, matchers)
-        assert result == "https://github.com/org/proj/releases/download/v1.0.0/binary-linux-amd64"
+        assert (
+            result
+            == "https://github.com/org/proj/releases/download/v1.0.0/binary-linux-amd64"
+        )
 
     def test_archive_files_match(self):
         """Test that archive files (tar.gz, zip) are matched correctly."""
         api_dict = {
             "json": {
                 "assets": [
-                    {"browser_download_url": "https://github.com/org/proj/releases/download/v1.0.0/binary-linux-amd64.tar.gz"},
-                    {"browser_download_url": "https://github.com/org/proj/releases/download/v1.0.0/binary-darwin-arm64.zip"},
+                    {
+                        "browser_download_url": "https://github.com/org/proj/releases/download/v1.0.0/binary-linux-amd64.tar.gz"
+                    },
+                    {
+                        "browser_download_url": "https://github.com/org/proj/releases/download/v1.0.0/binary-darwin-arm64.zip"
+                    },
                 ]
             }
         }
         matchers = ["linux-amd64"]
         result = filter_binaries(api_dict, matchers)
-        assert result == "https://github.com/org/proj/releases/download/v1.0.0/binary-linux-amd64.tar.gz"
+        assert (
+            result
+            == "https://github.com/org/proj/releases/download/v1.0.0/binary-linux-amd64.tar.gz"
+        )
 
     def test_filters_update_binaries(self):
         """Test that -update binaries are filtered out."""
         api_dict = {
             "json": {
                 "assets": [
-                    {"browser_download_url": "https://github.com/org/proj/releases/download/v1.0.0/binary-linux-amd64-update"},
-                    {"browser_download_url": "https://github.com/org/proj/releases/download/v1.0.0/binary-linux-amd64"},
+                    {
+                        "browser_download_url": "https://github.com/org/proj/releases/download/v1.0.0/binary-linux-amd64-update"
+                    },
+                    {
+                        "browser_download_url": "https://github.com/org/proj/releases/download/v1.0.0/binary-linux-amd64"
+                    },
                 ]
             }
         }
         matchers = ["linux-amd64"]
         result = filter_binaries(api_dict, matchers)
-        assert result == "https://github.com/org/proj/releases/download/v1.0.0/binary-linux-amd64"
+        assert (
+            result
+            == "https://github.com/org/proj/releases/download/v1.0.0/binary-linux-amd64"
+        )
 
     def test_real_world_chezmoi_example(self):
         """Test with real-world chezmoi release pattern."""
         api_dict = {
             "json": {
                 "assets": [
-                    {"browser_download_url": "https://github.com/twpayne/chezmoi/releases/download/v2.67.0/chezmoi-2.67.0-aarch64.rpm"},
-                    {"browser_download_url": "https://github.com/twpayne/chezmoi/releases/download/v2.67.0/chezmoi-darwin-arm64"},
-                    {"browser_download_url": "https://github.com/twpayne/chezmoi/releases/download/v2.67.0/chezmoi-linux-amd64"},
-                    {"browser_download_url": "https://github.com/twpayne/chezmoi/releases/download/v2.67.0/checksums.txt"},
+                    {
+                        "browser_download_url": "https://github.com/twpayne/chezmoi/releases/download/v2.67.0/chezmoi-2.67.0-aarch64.rpm"
+                    },
+                    {
+                        "browser_download_url": "https://github.com/twpayne/chezmoi/releases/download/v2.67.0/chezmoi-darwin-arm64"
+                    },
+                    {
+                        "browser_download_url": "https://github.com/twpayne/chezmoi/releases/download/v2.67.0/chezmoi-linux-amd64"
+                    },
+                    {
+                        "browser_download_url": "https://github.com/twpayne/chezmoi/releases/download/v2.67.0/checksums.txt"
+                    },
                 ]
             }
         }
         matchers = ["darwin-arm64", "aarch64-apple-darwin"]
         result = filter_binaries(api_dict, matchers)
-        assert result == "https://github.com/twpayne/chezmoi/releases/download/v2.67.0/chezmoi-darwin-arm64"
+        assert (
+            result
+            == "https://github.com/twpayne/chezmoi/releases/download/v2.67.0/chezmoi-darwin-arm64"
+        )
 
     def test_real_world_terraform_example(self):
         """Test with real-world terraform release pattern."""
         api_dict = {
             "json": {
                 "assets": [
-                    {"browser_download_url": "https://github.com/hashicorp/terraform/releases/download/v1.5.0/terraform_1.5.0_linux_amd64.zip"},
-                    {"browser_download_url": "https://github.com/hashicorp/terraform/releases/download/v1.5.0/terraform_1.5.0_linux_arm64.zip"},
-                    {"browser_download_url": "https://github.com/hashicorp/terraform/releases/download/v1.5.0/terraform_1.5.0_SHA256SUMS"},
+                    {
+                        "browser_download_url": "https://github.com/hashicorp/terraform/releases/download/v1.5.0/terraform_1.5.0_linux_amd64.zip"
+                    },
+                    {
+                        "browser_download_url": "https://github.com/hashicorp/terraform/releases/download/v1.5.0/terraform_1.5.0_linux_arm64.zip"
+                    },
+                    {
+                        "browser_download_url": "https://github.com/hashicorp/terraform/releases/download/v1.5.0/terraform_1.5.0_SHA256SUMS"
+                    },
                 ]
             }
         }
         matchers = ["linux_amd64", "linux-amd64"]
         result = filter_binaries(api_dict, matchers)
-        assert result == "https://github.com/hashicorp/terraform/releases/download/v1.5.0/terraform_1.5.0_linux_amd64.zip"
+        assert (
+            result
+            == "https://github.com/hashicorp/terraform/releases/download/v1.5.0/terraform_1.5.0_linux_amd64.zip"
+        )
 
     def test_variant_binaries_are_deprioritized(self):
         """Test that -server, -daemon, -cli, -agent variants are returned after the main binary."""
         api_dict = {
             "json": {
                 "assets": [
-                    {"browser_download_url": "https://github.com/org/proj/releases/download/v1.0.0/proj-server-linux-amd64"},
-                    {"browser_download_url": "https://github.com/org/proj/releases/download/v1.0.0/proj-daemon-linux-amd64"},
-                    {"browser_download_url": "https://github.com/org/proj/releases/download/v1.0.0/proj-cli-linux-amd64"},
-                    {"browser_download_url": "https://github.com/org/proj/releases/download/v1.0.0/proj-agent-linux-amd64"},
-                    {"browser_download_url": "https://github.com/org/proj/releases/download/v1.0.0/proj-linux-amd64"},
+                    {
+                        "browser_download_url": "https://github.com/org/proj/releases/download/v1.0.0/proj-server-linux-amd64"
+                    },
+                    {
+                        "browser_download_url": "https://github.com/org/proj/releases/download/v1.0.0/proj-daemon-linux-amd64"
+                    },
+                    {
+                        "browser_download_url": "https://github.com/org/proj/releases/download/v1.0.0/proj-cli-linux-amd64"
+                    },
+                    {
+                        "browser_download_url": "https://github.com/org/proj/releases/download/v1.0.0/proj-agent-linux-amd64"
+                    },
+                    {
+                        "browser_download_url": "https://github.com/org/proj/releases/download/v1.0.0/proj-linux-amd64"
+                    },
                 ]
             }
         }
         matchers = ["linux-amd64"]
         result = filter_binaries(api_dict, matchers)
-        assert result == "https://github.com/org/proj/releases/download/v1.0.0/proj-linux-amd64"
+        assert (
+            result
+            == "https://github.com/org/proj/releases/download/v1.0.0/proj-linux-amd64"
+        )
 
     def test_missing_json_key_raises_error(self):
         """Test that an error is raised when the json key is missing entirely."""
