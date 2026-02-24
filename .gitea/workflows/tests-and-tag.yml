@@ -100,3 +100,34 @@ jobs:
           git remote set-url origin https://oauth2:${{ secrets.GHDL_GITEA_PUSH_TOKEN }}@git.wzzrd.com/wzzrd/ansible-collection-ghdl.git
           git tag -a "v${{ needs.check-version.outputs.new_version }}" -m "Release v${{ needs.check-version.outputs.new_version }}"
           git push origin "v${{ needs.check-version.outputs.new_version }}"
+
+  publish:
+    name: Publish to Ansible Galaxy
+    runs-on: ubi9-aarch64-ansible
+    needs:
+      - tag
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build collection
+        run: ansible-galaxy collection build
+
+      - name: Publish collection
+        run: ansible-galaxy collection publish $(ls wzzrd-ghdl-*.tar.gz) --token ${{ secrets.GALAXY_API_KEY }}
+
+  mirror-tag:
+    name: Mirror tag to GitHub
+    runs-on: ubi9-aarch64-ansible
+    needs:
+      - tag
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Push tag to GitHub
+        run: |
+          git remote add github https://x-access-token:${{ secrets.GHDL_GITHUB_MIRROR_TOKEN }}@github.com/wzzrd/ansible-collection-ghdl.git
+          git push github --tags
