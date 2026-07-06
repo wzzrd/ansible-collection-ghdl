@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.1] - 2026-07-06
+
+### Changed
+- CI: run unit tests with Python 3.12 instead of 3.11
+
+## [2.1.0] - 2026-07-06
+
+### New features
+- **Variant binary selection.** Some projects ship multiple binaries in a
+  single release (e.g. atuin ships both a client and an `atuin-server` build).
+  By default the filter deprioritizes variant binaries so the main binary wins;
+  setting `downloader_variant` (e.g. `"server"`) now explicitly selects assets
+  whose filename contains `-{variant}` instead. Unknown variants fail with a
+  clear error listing the available assets.
+
 ## [2.0.3] - 2026-02-24
 
 ### Tests
