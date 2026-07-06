@@ -43,6 +43,16 @@ argument_specs:
         required: false
         default: /usr/local/bin
 
+      downloader_variant:
+        description:
+          - Select a specific release variant when a project ships multiple binaries in one release.
+          - When set, only assets whose filename contains '-{variant}' are considered.
+          - As an example, set to 'server' to select 'atuin-server-aarch64-unknown-linux-musl.tar.gz'
+            over the plain client binary.
+          - Combine with downloader_binary_name to control the installed filename.
+        type: str
+        required: false
+
       downloader_binary_name:
         description:
           - Override the installed binary filename.

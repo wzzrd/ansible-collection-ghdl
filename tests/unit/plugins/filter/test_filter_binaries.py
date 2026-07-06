@@ -354,6 +354,66 @@ class TestFilterBinaries:
             == "https://github.com/org/proj/releases/download/v1.0.0/proj-linux-amd64"
         )
 
+    def test_variant_selects_server_binary(self):
+        """Test that variant='server' selects the server binary over the client."""
+        api_dict = {
+            "json": {
+                "assets": [
+                    {
+                        "browser_download_url": "https://github.com/atuinsh/atuin/releases/download/v18.4.0/atuin-aarch64-unknown-linux-musl.tar.gz"
+                    },
+                    {
+                        "browser_download_url": "https://github.com/atuinsh/atuin/releases/download/v18.4.0/atuin-server-aarch64-unknown-linux-musl.tar.gz"
+                    },
+                ]
+            }
+        }
+        matchers = ["aarch64-unknown-linux-musl"]
+        result = filter_binaries(api_dict, matchers, variant="server")
+        assert (
+            result
+            == "https://github.com/atuinsh/atuin/releases/download/v18.4.0/atuin-server-aarch64-unknown-linux-musl.tar.gz"
+        )
+
+    def test_no_variant_still_deprioritizes_server(self):
+        """Test that without variant, the client binary is still returned (deprioritization)."""
+        api_dict = {
+            "json": {
+                "assets": [
+                    {
+                        "browser_download_url": "https://github.com/atuinsh/atuin/releases/download/v18.4.0/atuin-server-aarch64-unknown-linux-musl.tar.gz"
+                    },
+                    {
+                        "browser_download_url": "https://github.com/atuinsh/atuin/releases/download/v18.4.0/atuin-aarch64-unknown-linux-musl.tar.gz"
+                    },
+                ]
+            }
+        }
+        matchers = ["aarch64-unknown-linux-musl"]
+        result = filter_binaries(api_dict, matchers)
+        assert (
+            result
+            == "https://github.com/atuinsh/atuin/releases/download/v18.4.0/atuin-aarch64-unknown-linux-musl.tar.gz"
+        )
+
+    def test_variant_not_found_raises_error(self):
+        """Test that requesting a variant that doesn't exist raises a clear error."""
+        api_dict = {
+            "json": {
+                "assets": [
+                    {
+                        "browser_download_url": "https://github.com/atuinsh/atuin/releases/download/v18.4.0/atuin-aarch64-unknown-linux-musl.tar.gz"
+                    },
+                ]
+            }
+        }
+        matchers = ["aarch64-unknown-linux-musl"]
+        with pytest.raises(AnsibleFilterError) as exc_info:
+            filter_binaries(api_dict, matchers, variant="server")
+        error_msg = str(exc_info.value)
+        assert "variant 'server'" in error_msg
+        assert "atuin-aarch64-unknown-linux-musl.tar.gz" in error_msg
+
     def test_missing_json_key_raises_error(self):
         """Test that an error is raised when the json key is missing entirely."""
         api_dict = {"status": 200, "no_json_here": {}}

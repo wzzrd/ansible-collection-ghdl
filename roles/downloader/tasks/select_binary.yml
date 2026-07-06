@@ -64,12 +64,14 @@
 
 - name: Select binary URL for latest version
   ansible.builtin.set_fact:
-    downloader_result_url: "{{ downloader_api_latest | wzzrd.ghdl.filter_binaries(downloader_matcher_list) }}"
+    downloader_result_url: >-
+      {{ downloader_api_latest | wzzrd.ghdl.filter_binaries(downloader_matcher_list, downloader_variant | default('')) }}
   when: downloader_api_latest.json.assets is defined
 
 - name: Select binary URL for named version
   ansible.builtin.set_fact:
-    downloader_result_url: "{{ downloader_api_versioned | wzzrd.ghdl.filter_binaries(downloader_matcher_list) }}"
+    downloader_result_url: >-
+      {{ downloader_api_versioned | wzzrd.ghdl.filter_binaries(downloader_matcher_list, downloader_variant | default('')) }}
   when: downloader_api_versioned.json.assets is defined
 
 - name: Show resulting download URL on GitHub

@@ -47,7 +47,7 @@ _value:
 from ansible.errors import AnsibleFilterError
 
 
-def filter_binaries(api_dict, matchers):
+def filter_binaries(api_dict, matchers, variant=""):
     """Filter GitHub API release assets to find the best matching binary download URL."""
     if not isinstance(api_dict, dict):
         raise AnsibleFilterError(
@@ -87,6 +87,17 @@ def filter_binaries(api_dict, matchers):
             f"After filtering for matchers: {[e.split('/')[-1] for e in filtered_urls]}. "
             f"After removing package formats: {binary_urls}"
         )
+
+    if variant:
+        variant_pattern = f"-{variant}"
+        variant_urls = [e for e in binary_urls if variant_pattern in e.split("/")[-1]]
+        if not variant_urls:
+            raise AnsibleFilterError(
+                f"No matching binaries found for variant '{variant}' with matchers {matchers}. "
+                f"Available assets after architecture and format filtering: "
+                f"{[e.split('/')[-1] for e in binary_urls]}"
+            )
+        return variant_urls[0]
 
     # Prioritize main binaries over variants (server, daemon, cli, agent, etc.)
     # Extract filenames for sorting
