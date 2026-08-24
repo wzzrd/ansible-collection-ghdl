@@ -6,3 +6,4 @@ plugins/filter/__pycache__
 .vscode
 *.pyc
 .claude
+collections
