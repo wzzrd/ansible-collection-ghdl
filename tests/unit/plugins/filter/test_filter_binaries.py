@@ -414,6 +414,136 @@ class TestFilterBinaries:
         assert "variant 'server'" in error_msg
         assert "atuin-aarch64-unknown-linux-musl.tar.gz" in error_msg
 
+    def test_musl_preferred_over_gnu_regardless_of_asset_order(self):
+        """Test that musl wins even when GitHub lists the glibc asset first."""
+        gnu = "https://github.com/org/proj/releases/download/v1.0.0/proj-x86_64-unknown-linux-gnu.tar.gz"
+        musl = "https://github.com/org/proj/releases/download/v1.0.0/proj-x86_64-unknown-linux-musl.tar.gz"
+        matchers = [
+            "x86_64-unknown-linux-musl",
+            "x86_64-unknown-linux-gnu",
+            "linux_amd64",
+        ]
+
+        for order in ([gnu, musl], [musl, gnu]):
+            api_dict = {
+                "json": {"assets": [{"browser_download_url": url} for url in order]}
+            }
+            assert filter_binaries(api_dict, matchers) == musl
+
+    def test_libc_gnu_selects_glibc_build(self):
+        """Test that libc='gnu' selects the glibc build over the musl one."""
+        gnu = "https://github.com/org/proj/releases/download/v1.0.0/proj-x86_64-unknown-linux-gnu.tar.gz"
+        musl = "https://github.com/org/proj/releases/download/v1.0.0/proj-x86_64-unknown-linux-musl.tar.gz"
+        api_dict = {
+            "json": {
+                "assets": [
+                    {"browser_download_url": musl},
+                    {"browser_download_url": gnu},
+                ]
+            }
+        }
+        matchers = ["x86_64-unknown-linux-musl", "x86_64-unknown-linux-gnu"]
+        assert filter_binaries(api_dict, matchers, libc="gnu") == gnu
+
+    def test_libc_any_defers_to_matcher_order(self):
+        """Test that libc='any' drops the libc dimension and lets matcher order decide."""
+        gnu = "https://github.com/org/proj/releases/download/v1.0.0/proj-x86_64-unknown-linux-gnu.tar.gz"
+        musl = "https://github.com/org/proj/releases/download/v1.0.0/proj-x86_64-unknown-linux-musl.tar.gz"
+        api_dict = {
+            "json": {
+                "assets": [
+                    {"browser_download_url": musl},
+                    {"browser_download_url": gnu},
+                ]
+            }
+        }
+        # gnu first in the matcher list, so gnu wins despite musl being listed first.
+        matchers = ["x86_64-unknown-linux-gnu", "x86_64-unknown-linux-musl"]
+        assert filter_binaries(api_dict, matchers, libc="any") == gnu
+
+    def test_libc_any_falls_back_to_asset_order_on_a_full_tie(self):
+        """Test that assets tying on every rank keep the order GitHub returned them in."""
+        matchers = ["linux-amd64"]
+
+        for order in ("binary", "another"), ("another", "binary"):
+            urls = [
+                f"https://github.com/org/proj/releases/download/v1.0.0/{name}-linux-amd64"
+                for name in order
+            ]
+            api_dict = {
+                "json": {"assets": [{"browser_download_url": url} for url in urls]}
+            }
+            assert filter_binaries(api_dict, matchers, libc="any") == urls[0]
+
+    def test_libc_agnostic_asset_beats_unpreferred_flavour(self):
+        """Test that an asset naming no libc outranks the flavour that was not requested."""
+        gnu = "https://github.com/org/proj/releases/download/v1.0.0/proj-x86_64-unknown-linux-gnu.tar.gz"
+        plain = "https://github.com/org/proj/releases/download/v1.0.0/proj-linux-amd64.tar.gz"
+        api_dict = {
+            "json": {
+                "assets": [
+                    {"browser_download_url": gnu},
+                    {"browser_download_url": plain},
+                ]
+            }
+        }
+        matchers = ["x86_64-unknown-linux-gnu", "linux-amd64"]
+        assert filter_binaries(api_dict, matchers) == plain
+
+    def test_libc_detection_ignores_embedded_substrings(self):
+        """Test that a project named gnupg is not mistaken for a glibc build."""
+        gnupg = "https://github.com/org/gnupg/releases/download/v1.0.0/gnupg-linux-amd64.tar.gz"
+        api_dict = {"json": {"assets": [{"browser_download_url": gnupg}]}}
+        # Would rank as an unwanted glibc build if 'gnu' were matched as a bare substring.
+        assert filter_binaries(api_dict, ["linux-amd64"], libc="musl") == gnupg
+
+    def test_matcher_order_breaks_ties(self):
+        """Test that earlier matchers win when libc flavour does not decide."""
+        second = "https://github.com/org/proj/releases/download/v1.0.0/proj_1.0.0_linux_amd64.tar.gz"
+        first = "https://github.com/org/proj/releases/download/v1.0.0/proj_1.0.0_amd64_linux.tar.gz"
+        api_dict = {
+            "json": {
+                "assets": [
+                    {"browser_download_url": second},
+                    {"browser_download_url": first},
+                ]
+            }
+        }
+        matchers = ["amd64_linux", "linux_amd64"]
+        assert filter_binaries(api_dict, matchers) == first
+
+    def test_variant_selection_respects_libc_preference(self):
+        """Test that variant selection still prefers the musl build."""
+        gnu = "https://github.com/atuinsh/atuin/releases/download/v18.4.0/atuin-server-x86_64-unknown-linux-gnu.tar.gz"
+        musl = "https://github.com/atuinsh/atuin/releases/download/v18.4.0/atuin-server-x86_64-unknown-linux-musl.tar.gz"
+        api_dict = {
+            "json": {
+                "assets": [
+                    {"browser_download_url": gnu},
+                    {"browser_download_url": musl},
+                ]
+            }
+        }
+        matchers = ["x86_64-unknown-linux-musl", "x86_64-unknown-linux-gnu"]
+        assert filter_binaries(api_dict, matchers, variant="server") == musl
+
+    def test_invalid_libc_raises_error(self):
+        """Test that an unknown libc preference is rejected."""
+        api_dict = {
+            "json": {
+                "assets": [
+                    {
+                        "browser_download_url": "https://github.com/org/proj/releases/download/v1.0.0/proj-linux-amd64"
+                    },
+                ]
+            }
+        }
+
+        with pytest.raises(AnsibleFilterError) as exc_info:
+            filter_binaries(api_dict, ["linux-amd64"], libc="uclibc")
+
+        assert "Invalid libc preference" in str(exc_info.value)
+
     def test_missing_json_key_raises_error(self):
         """Test that an error is raised when the json key is missing entirely."""
         api_dict = {"status": 200, "no_json_here": {}}

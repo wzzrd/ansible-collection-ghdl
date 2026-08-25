@@ -15,6 +15,14 @@ downloader_matchers_linux_aarch64:
 
 downloader_matchers_darwin_arm64: []
 
+# Prefer statically linked musl builds: they carry no glibc version
+# requirement, so they run on older targets. musl reads /etc/passwd and
+# /etc/group directly, so local users resolve fine; set 'gnu' when the binary
+# must resolve users from an NSS directory backend (sssd, LDAP, AD) or depends
+# on glibc DNS behaviour. Set 'any' to ignore libc flavour entirely and leave
+# selection to the order of the matcher list.
+downloader_libc: musl
+
 downloader_install_dir: /usr/local/bin
 
 downloader_binary_owner: root

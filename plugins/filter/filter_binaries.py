@@ -20,9 +20,30 @@ options:
         description:
             - List of substrings to match against asset download URLs
             - URLs containing any of these substrings will be included
+            - Order matters, earlier matchers are preferred over later ones
         type: list
         elements: str
         required: true
+    variant:
+        description:
+            - Select a specific release variant, e.g. 'server'
+            - When set, only assets whose filename contains '-{variant}' are considered
+        type: str
+        required: false
+        default: ""
+    libc:
+        description:
+            - Preferred C library flavour when a release ships both musl and glibc builds
+            - musl prefers statically linked musl builds, which run on older systems
+            - gnu prefers glibc builds, which keep NSS lookups and glibc DNS behaviour
+            - any disables the libc preference, leaving selection to matcher order
+        type: str
+        required: false
+        default: musl
+        choices:
+            - musl
+            - gnu
+            - any
 """
 
 EXAMPLES = r"""
@@ -44,10 +65,40 @@ _value:
     returned: success
 """
 
+import re
+
 from ansible.errors import AnsibleFilterError
 
+LIBC_CHOICES = ("musl", "gnu", "any")
 
-def filter_binaries(api_dict, matchers, variant=""):
+# Match a libc token only when it is delimited by a separator or string boundary,
+# so 'gnupg-linux-amd64' is not mistaken for a glibc build. The optional eabi
+# suffix covers arm naming such as 'arm-unknown-linux-gnueabihf'.
+MUSL_RE = re.compile(r"(?:^|[._-])musl(?:eabi(?:hf)?)?(?:$|[._-])")
+GNU_RE = re.compile(r"(?:^|[._-])(?:gnu|glibc)(?:eabi(?:hf)?)?(?:$|[._-])")
+
+
+def libc_rank(filename, libc):
+    """Rank a filename by libc flavour, lower sorts first.
+
+    Assets that name no libc at all (typically Go builds, which are static
+    anyway) sort between the two, so an explicitly preferred flavour still wins
+    but a plain asset beats the flavour that was not asked for.
+    """
+    if libc == "any":
+        return 0
+
+    if MUSL_RE.search(filename):
+        found = "musl"
+    elif GNU_RE.search(filename):
+        found = "gnu"
+    else:
+        return 1
+
+    return 0 if found == libc else 2
+
+
+def filter_binaries(api_dict, matchers, variant="", libc="musl"):
     """Filter GitHub API release assets to find the best matching binary download URL."""
     if not isinstance(api_dict, dict):
         raise AnsibleFilterError(
@@ -57,6 +108,11 @@ def filter_binaries(api_dict, matchers, variant=""):
     if not isinstance(matchers, list):
         raise AnsibleFilterError(
             "The second argument must be a list of substrings to match against the GitHub API output."
+        )
+
+    if libc not in LIBC_CHOICES:
+        raise AnsibleFilterError(
+            f"Invalid libc preference '{libc}'. Valid choices are: {', '.join(LIBC_CHOICES)}."
         )
 
     if "json" not in api_dict:
@@ -88,6 +144,26 @@ def filter_binaries(api_dict, matchers, variant=""):
             f"After removing package formats: {binary_urls}"
         )
 
+    # Prioritize main binaries over variants (server, daemon, cli, agent, etc.)
+    deprioritize_patterns = ["-server", "-android", "-daemon", "-agent", "-cli"]
+
+    def sort_priority(url):
+        """Rank a candidate URL, lowest sorts first.
+
+        Ranks on three dimensions in order: main binaries before variant
+        binaries, preferred libc flavour before the rest, and earlier matchers
+        before later ones. Sorting is stable, so assets that tie on all three
+        keep the order GitHub returned them in.
+        """
+        filename = url.split("/")[-1]
+        variant_rank = (
+            1 if any(pattern in filename for pattern in deprioritize_patterns) else 0
+        )
+        matcher_rank = next(
+            (i for i, match in enumerate(matchers) if match in url), len(matchers)
+        )
+        return (variant_rank, libc_rank(filename, libc), matcher_rank)
+
     if variant:
         variant_pattern = f"-{variant}"
         variant_urls = [e for e in binary_urls if variant_pattern in e.split("/")[-1]]
@@ -97,20 +173,9 @@ def filter_binaries(api_dict, matchers, variant=""):
                 f"Available assets after architecture and format filtering: "
                 f"{[e.split('/')[-1] for e in binary_urls]}"
             )
-        return variant_urls[0]
+        return sorted(variant_urls, key=sort_priority)[0]
 
-    # Prioritize main binaries over variants (server, daemon, cli, agent, etc.)
-    # Extract filenames for sorting
-    deprioritize_patterns = ["-server", "-android", "-daemon", "-agent", "-cli"]
-
-    def sort_priority(url):
-        """Return 0 for main binaries, 1 for variant binaries (lower = higher priority)"""
-        filename = url.split("/")[-1]
-        return 1 if any(pattern in filename for pattern in deprioritize_patterns) else 0
-
-    binary_urls_sorted = sorted(binary_urls, key=sort_priority)
-
-    return binary_urls_sorted[0]
+    return sorted(binary_urls, key=sort_priority)[0]
 
 
 class FilterModule(object):

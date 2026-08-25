@@ -5,6 +5,52 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.0] - 2026-08-24
+
+### Breaking changes
+
+- **Releases that ship both musl and glibc builds now install the musl build.**
+  Previously the matcher lists in `defaults/main.yml` looked like they expressed
+  a preference — musl was listed first — but `filter_binaries` treated matchers
+  as an unordered set and returned whichever asset GitHub happened to list
+  first. Which libc you got was effectively arbitrary and could change between
+  releases of the same upstream project.
+
+  Playbooks that are otherwise unchanged may therefore install a different
+  artifact after upgrading. This is deliberate: statically linked musl builds
+  carry no glibc version requirement and run on older targets.
+
+  Be aware that musl implements no NSS and never reads `/etc/nsswitch.conf`. It
+  parses `/etc/passwd` and `/etc/group` directly, so local users resolve
+  normally, but identities that exist only in a directory backend (sssd, LDAP,
+  AD, winbind, nss-systemd `DynamicUser`) do not — on a domain-joined host,
+  tools like `lsd`, `dust` and `duf` will show numeric IDs for those users.
+  musl's DNS resolver also differs from glibc's, and NSS host backends such as
+  `nss-myhostname` and `nss-resolve` are unavailable. Set `downloader_libc: gnu`
+  for tools where any of that matters.
+
+- **Matcher list order is now significant.** When several assets match, the one
+  matching the earliest entry in the list wins. Custom matcher lists that
+  relied on the previous order-insensitive behaviour may select differently.
+
+### New features
+
+- **`downloader_libc`.** Chooses the preferred C library flavour: `musl`
+  (default), `gnu`, or `any` to disable the preference and select on matcher
+  order alone. Assets that name no libc, such as most Go builds, are
+  unaffected.
+
+### Fixed
+
+- Variant selection (`downloader_variant`) now applies the same libc and
+  matcher-order ranking as normal selection, instead of taking whichever
+  variant asset GitHub listed first.
+
+### Documentation
+
+- Document `downloader_variant` in the README variables table; it shipped in
+  2.1.0 but was never listed there.
+
 ## [2.1.1] - 2026-07-06
 
 ### Changed

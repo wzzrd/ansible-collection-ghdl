@@ -65,18 +65,22 @@
 - name: Select binary URL for latest version
   ansible.builtin.set_fact:
     downloader_result_url: >-
-      {{ downloader_api_latest | wzzrd.ghdl.filter_binaries(downloader_matcher_list, downloader_variant | default('')) }}
+      {{ downloader_api_latest | wzzrd.ghdl.filter_binaries(downloader_matcher_list,
+                                                            downloader_variant | default(''),
+                                                            downloader_libc) }}
   when: downloader_api_latest.json.assets is defined
 
 - name: Select binary URL for named version
   ansible.builtin.set_fact:
     downloader_result_url: >-
-      {{ downloader_api_versioned | wzzrd.ghdl.filter_binaries(downloader_matcher_list, downloader_variant | default('')) }}
+      {{ downloader_api_versioned | wzzrd.ghdl.filter_binaries(downloader_matcher_list,
+                                                               downloader_variant | default(''),
+                                                               downloader_libc) }}
   when: downloader_api_versioned.json.assets is defined
 
 - name: Show resulting download URL on GitHub
   ansible.builtin.debug:
-    msg: "url: {{ downloader_result_url }}"
+    msg: "url: {{ downloader_result_url }} (libc preference: {{ downloader_libc }})"
   when: downloader_debug | default(false)
 
 - name: Get list of all asset names for checksum detection

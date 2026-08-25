@@ -53,6 +53,30 @@ argument_specs:
         type: str
         required: false
 
+      downloader_libc:
+        description:
+          - Preferred C library flavour when a release ships both musl and glibc builds.
+          - >-
+            musl prefers statically linked musl builds. These carry no glibc version
+            requirement, so they run on older targets without a GLIBC_x.yy not found error.
+          - >-
+            gnu prefers glibc builds. Use this when the binary must resolve identities
+            that come from an NSS directory backend such as sssd, LDAP, AD or winbind.
+            musl implements no NSS and reads /etc/passwd and /etc/group directly, so
+            local users resolve normally but directory users show as numeric IDs.
+            Also use gnu when the binary depends on glibc DNS resolver behaviour.
+          - >-
+            any disables the libc preference, leaving selection to the order of the
+            matcher list for this architecture.
+          - Assets that name no libc at all, such as most Go builds, are unaffected.
+        type: str
+        required: false
+        default: musl
+        choices:
+          - musl
+          - gnu
+          - any
+
       downloader_binary_name:
         description:
           - Override the installed binary filename.

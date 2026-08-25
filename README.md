@@ -60,15 +60,70 @@ three aarch64 hosts result in two downloads, not eight.
 |---|---|---|
 | `downloader_version` | latest release | Specific release tag, e.g. `"v1.0.0"` |
 | `downloader_install_dir` | `/usr/local/bin` | Directory to install the binary |
+| `downloader_libc` | `musl` | Preferred C library flavour: `musl`, `gnu` or `any`. See [libc preference](#libc-preference) |
+| `downloader_variant` | unset | Select a specific build when a release ships several, e.g. `"server"` for `atuin-server-x86_64-unknown-linux-musl.tar.gz` |
 | `downloader_binary_name` | derived from release asset name | Override the installed filename. Use when the binary name differs from the project name, e.g. project `ripgrep` installs as `rg` |
 | `downloader_binary_owner` | `root` | Owner of the installed binary |
 | `downloader_binary_group` | `root` | Group of the installed binary |
 | `downloader_debug` | `false` | Print verbose output: available assets, selected URL, checksum details, extracted files |
 
+### libc preference
+
+Many projects publish both a musl and a glibc build of the same binary. The
+role prefers the **musl** build by default, because those are statically linked
+and carry no glibc version requirement — they run on older targets that would
+reject a glibc build with `GLIBC_2.xx not found`.
+
+```yaml
+downloader_libc: musl # default
+```
+
+| Value | Behaviour |
+|---|---|
+| `musl` | Prefer musl builds, then assets naming no libc, then glibc builds |
+| `gnu` | Prefer glibc builds, then assets naming no libc, then musl builds |
+| `any` | Ignore libc flavour entirely; selection falls to matcher order |
+
+Assets that name no libc at all — most Go releases, e.g. `terraform_1.5.0_linux_amd64.zip` —
+are unaffected by this setting.
+
+**When to choose `gnu`:** musl implements no NSS — it never reads
+`/etc/nsswitch.conf`. It resolves users and groups by parsing `/etc/passwd` and
+`/etc/group` directly, so **local users always resolve normally**. What a musl
+build cannot see is an identity that exists *only* in a directory backend:
+sssd, LDAP, Active Directory, winbind, or nss-systemd `DynamicUser`. On a
+domain-joined host, tools that map UIDs to names (`lsd -l`, `dust`, `duf`) will
+print numeric IDs for those users instead of names.
+
+Note this is a property of musl, not of static linking — a dynamically linked
+musl build behaves the same way.
+
+Hostname resolution is largely unaffected: musl reads `/etc/hosts` and queries
+DNS from `/etc/resolv.conf` with its own resolver. What is lost is NSS host
+backends such as `nss-myhostname`, `nss-resolve` and mDNS. musl's resolver also
+differs from glibc's in its handling of `search`/`ndots`, and lacked TCP
+fallback for responses over 512 bytes before musl 1.2.4.
+
+If any of that applies, set `downloader_libc: gnu` for that tool:
+
+```yaml
+- name: Install lsd with glibc so LDAP usernames resolve
+  ansible.builtin.include_role:
+    name: wzzrd.ghdl.downloader
+  vars:
+    downloader_organization: lsd-rs
+    downloader_project: lsd
+    downloader_libc: gnu
+```
+
 ### Architecture matchers
 
 The role selects the right binary by matching release asset filenames against a
 list of substrings. Each supported platform has its own matcher list.
+
+**Order matters**: when several assets match, the one matching the earliest
+entry in the list wins. `downloader_libc` is applied first, so matcher order
+decides only between assets of the same libc flavour.
 
 **Linux x86_64** (`downloader_matchers_linux_x86_64`):
 ```yaml

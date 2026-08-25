@@ -57,8 +57,36 @@ The filter plugin (`filter_binaries.py`) receives GitHub API release data and ma
 3. Extracts all `browser_download_url` from assets
 4. Filters URLs containing any matcher substring
 5. Excludes package formats: `sha256`, `-update`, `apk`, `android`, `rpm`, `deb`, `zst`, `exe`
-6. Deprioritizes variant binaries (`-server`, `-daemon`, `-cli`, `-agent`) so the main binary is returned first
-7. Returns first match or raises `AnsibleFilterError` with full diagnostic info
+6. Ranks the survivors on three keys, lowest first, and returns the best one:
+   1. **Variant**: main binaries before `-server`, `-daemon`, `-cli`, `-agent`, `-android`
+   2. **libc**: preferred flavour, then assets naming no libc, then the other flavour
+      (see `downloader_libc`; `any` collapses this key to a constant)
+   3. **Matcher order**: index of the first matcher in the list that matches the URL
+7. Sorting is stable, so assets tying on all three keep GitHub's asset order
+8. Raises `AnsibleFilterError` with full diagnostic info when nothing matches
+
+**Matcher list order is significant** — earlier entries win. This was not true before
+3.0.0, when the filter treated matchers as an unordered set and returned whichever
+asset GitHub listed first.
+
+### libc Preference
+
+`downloader_libc` (default `musl`) decides which build wins when a release ships both.
+musl builds are statically linked and carry no glibc version requirement, so they run
+on older targets. The tradeoff: musl implements no NSS and never reads
+`/etc/nsswitch.conf`. It parses `/etc/passwd` and `/etc/group` directly, so local users
+resolve normally; only identities that exist solely in a directory backend (sssd, LDAP,
+AD, winbind, nss-systemd `DynamicUser`) fail to resolve and show as numeric IDs. This is
+a musl property, not a static-linking property. musl's DNS resolver also differs from
+glibc's. Set `downloader_libc: gnu` for tools where that matters.
+
+Do not describe this as "static binaries cannot do NSS lookups" — that conflates musl
+with statically linked *glibc*, which is the case where NSS genuinely breaks at the
+`dlopen` level.
+
+libc detection is regex-based with separator boundaries (`MUSL_RE`, `GNU_RE`) so that a
+project named `gnupg` is not misread as a glibc build. The optional `eabi`/`eabihf`
+suffix is handled for arm triples.
 
 ### Archive vs Binary Handling
 
@@ -182,6 +210,8 @@ When the Ansible controller runs on macOS, the role automatically uses GNU tar (
 - `downloader_install_dir` - Install path (default: `/usr/local/bin`)
 - `downloader_binary_name` - Override binary name
 - `downloader_binary_owner` / `_group` - File ownership (default: `root`/`root`)
+- `downloader_libc` - Preferred C library: `musl` (default), `gnu`, or `any`
+- `downloader_variant` - Select a specific build, e.g. `server` (default: main binary)
 - `downloader_debug` - Enable verbose output (default: `false`)
 
 ## Debug Output
